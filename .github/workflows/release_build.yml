@@ -23,14 +23,13 @@ jobs:
     - name: Build the project
       run: dotnet build --configuration Release  # Build the project in Release configuration
 
-    # Publish the project as a single file
+    # Publish the project as a single file (without trimming)
     - name: Publish the project as a single file
       run: |
-        dotnet publish -c Release -r win-x64 --self-contained false /p:PublishSingleFile=true /p:PublishTrimmed=true --output ./publish
-      # Use win-x64 for Windows target. You can replace with linux-x64 or osx-x64 for other platforms.
+        dotnet publish -c Release -r win-x64 --self-contained false /p:PublishSingleFile=true --output ./publish
+      # This publishes a single executable file for Windows (win-x64).
       # self-contained=false: The application will not package the .NET runtime (change to true if needed).
       # PublishSingleFile=true: Ensures the output is a single executable file.
-      # PublishTrimmed=true: This trims unused assemblies to reduce size.
 
     # Zip the entire published folder
     - name: Zip the publish folder (Full)
@@ -38,7 +37,7 @@ jobs:
         powershell Compress-Archive -Path ./publish/* -DestinationPath ./WintonFull.zip
       # Compress the entire publish folder into WintonFull.zip
     
-    # Zip only the single-file executable
+    # Zip only the single executable
     - name: Zip the single executable
       run: |
         $singleFile = Get-ChildItem -Path ./publish/ | Where-Object { $_.Name -like "*.exe" }
