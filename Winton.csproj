@@ -34,6 +34,10 @@
     <Resource Include="Image\SF2.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include=".github\workflow\release_version.yml" />
+  </ItemGroup>
+
 
 
 </Project>
