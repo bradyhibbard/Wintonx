@@ -32,10 +32,18 @@ jobs:
       # PublishSingleFile=true: Ensures the output is a single executable file.
       # PublishTrimmed=true: This trims unused assemblies to reduce size.
 
-    # Zip the published output
-    - name: Zip the publish folder
+    # Zip the entire published folder
+    - name: Zip the publish folder (Full)
       run: |
-        powershell Compress-Archive -Path ./publish/* -DestinationPath ./Winton.zip  # Compress the publish folder to a zip file
+        powershell Compress-Archive -Path ./publish/* -DestinationPath ./WintonFull.zip
+      # Compress the entire publish folder into WintonFull.zip
+    
+    # Zip only the single-file executable
+    - name: Zip the single executable
+      run: |
+        $singleFile = Get-ChildItem -Path ./publish/ | Where-Object { $_.Name -like "*.exe" }
+        powershell Compress-Archive -Path $singleFile.FullName -DestinationPath ./WintonSingleFile.zip
+      # Compress the single-file executable into WintonSingleFile.zip
 
     # Create a GitHub Release
     - name: Create GitHub Release
@@ -49,13 +57,24 @@ jobs:
         draft: false
         prerelease: false
 
-    # Upload release asset (the zipped file)
-    - name: Upload release asset
+    # Upload full publish folder as zip file
+    - name: Upload full publish folder
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token from repository secrets
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}  # Upload to the release created earlier
-        asset_path: ./Winton.zip  # Path to the asset
-        asset_name: Winton.zip  # Name the asset
+        asset_path: ./WintonFull.zip  # Path to the full publish zip
+        asset_name: WintonFull.zip  # Name of the full publish zip file
+        asset_content_type: application/zip  # Specify the asset content type as a zip file
+
+    # Upload single-file executable as zip file
+    - name: Upload single-file executable
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token from repository secrets
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}  # Upload to the release created earlier
+        asset_path: ./WintonSingleFile.zip  # Path to the single executable zip
+        asset_name: WintonSingleFile.zip  # Name of the single executable zip file
         asset_content_type: application/zip  # Specify the asset content type as a zip file
