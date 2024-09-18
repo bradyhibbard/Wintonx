@@ -1,0 +1,111 @@
+﻿<UserControl x:Class="Winton.Views.Dashboard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d"
+             xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+             d:DesignHeight="600" d:DesignWidth="800">
+	<Grid Margin="0,0,0,0">
+		<!-- Background Image -->
+		<Grid.Background>
+			<ImageBrush ImageSource="pack://application:,,,/Winton;component/Image/Couch.jpg" Stretch="UniformToFill" Opacity="0.3"/>
+		</Grid.Background>
+
+		<!-- Content -->
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" MinHeight="45"/>
+			<RowDefinition Height="Auto" MinHeight="174"/>
+			<RowDefinition/>
+		</Grid.RowDefinitions>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="41*"/>
+			<ColumnDefinition Width="212*"/>
+			<ColumnDefinition Width="253*"/>
+			<ColumnDefinition Width="253*"/>
+		</Grid.ColumnDefinitions>
+
+		<!-- Obscuring Overlay -->
+		<Rectangle Fill="#AA333333" Grid.RowSpan="3" Grid.ColumnSpan="4" Margin="-1,-14,-2,-3"/>
+
+		<!-- Summary Panels -->
+		<Border Background="LightGray" Padding="10" Margin="5,5,5,5" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" CornerRadius="5">
+			<StackPanel>
+				<TextBlock Text="Annual Revenue" FontWeight="Bold"/>
+				<TextBlock Text="{Binding TotalRevenue, StringFormat=C}" FontSize="20" Height="60" TextAlignment="Center" Margin="0,30,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+			</StackPanel>
+			<Border.Effect>
+				<DropShadowEffect ShadowDepth="5" BlurRadius="10" Opacity="0.5" />
+			</Border.Effect>
+		</Border>
+
+		<Border Background="LightGray" Padding="10" Margin="5,5,5,5" Grid.Row="1" Grid.Column="2" CornerRadius="5">
+			<StackPanel>
+				<TextBlock Text="Current Month Revenue" FontWeight="Bold"/>
+				<TextBlock Text="{Binding MonthlyRevenue, StringFormat=C}" FontSize="20" Height="60" TextAlignment="Center" Margin="0,30,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+			</StackPanel>
+			<Border.Effect>
+				<DropShadowEffect ShadowDepth="5" BlurRadius="10" Opacity="0.5" />
+			</Border.Effect>
+		</Border>
+
+		<Border Background="LightGray" Padding="10" Margin="5,5,5,5" Grid.Row="1" Grid.Column="3" CornerRadius="5">
+			<StackPanel>
+				<TextBlock Text="Top Performing Sections" FontWeight="Bold"/>
+				<TextBlock Text="{Binding TotalCustomers}" FontSize="20" Height="60" TextAlignment="Center" Margin="0,30,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+			</StackPanel>
+			<Border.Effect>
+				<DropShadowEffect ShadowDepth="5" BlurRadius="10" Opacity="0.5" />
+			</Border.Effect>
+		</Border>
+
+		<!-- Charts -->
+		<Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Margin="0,0,0,10">
+			<Grid.RowDefinitions>
+				<RowDefinition/>
+				<RowDefinition Height="0*"/>
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="*"/>
+			</Grid.ColumnDefinitions>
+
+			<!-- Comparison Chart -->
+			<StackPanel Grid.Row="0" Grid.Column="0" Margin="5,5,5,5">
+				<Border Background="LightGray" Height="300" CornerRadius="5">
+					<StackPanel Margin="10">
+						<TextBlock Text="Revenue Comparison Chart" FontWeight="Bold" FontSize="13" Margin="10,0"/>
+						<lvc:CartesianChart Height="231" MouseLeftButtonUp="OpenDetailedChart_Click">
+							<lvc:CartesianChart.Series>
+								<lvc:LineSeries Title="Current Year" Values="{Binding CurrentYearRevenue[0].Values}" />
+								<lvc:LineSeries Title="Previous Year" Values="{Binding PreviousYearRevenue[0].Values}" />
+							</lvc:CartesianChart.Series>
+							<lvc:CartesianChart.AxisX>
+								<lvc:Axis Title="Months" Labels="{Binding Months}"></lvc:Axis>
+							</lvc:CartesianChart.AxisX>
+							<lvc:CartesianChart.AxisY>
+								<lvc:Axis Title="Revenue" LabelFormatter="{Binding Formatter}"></lvc:Axis>
+							</lvc:CartesianChart.AxisY>
+						</lvc:CartesianChart>
+					</StackPanel>
+					<Border.Effect>
+						<DropShadowEffect ShadowDepth="5" BlurRadius="10" Opacity="0.5" />
+					</Border.Effect>
+				</Border>
+			</StackPanel>
+
+			<!-- Category Sales Chart -->
+			<StackPanel Grid.Row="0" Grid.Column="1" Margin="5,5,5,5">
+				<Border Background="LightGray" Height="300" CornerRadius="5">
+					<StackPanel Margin="10">
+						<TextBlock Text="Category Sales Chart" FontWeight="Bold" FontSize="13" Margin="10,0"/>
+						<lvc:PieChart Height="232" Series="{Binding CategorySales}" LegendLocation="Right"/>
+					</StackPanel>
+					<Border.Effect>
+						<DropShadowEffect ShadowDepth="5" BlurRadius="10" Opacity="0.5" />
+					</Border.Effect>
+				</Border>
+			</StackPanel>
+		</Grid>
+	</Grid>
+</UserControl>

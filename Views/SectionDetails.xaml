@@ -1,0 +1,53 @@
+﻿<Window x:Class="Winton.Views.SectionDetails"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Winton.Views"
+                Title="Section Details" Height="281" Width="547" Background="#2D2D30">
+	<DockPanel LastChildFill="True" Margin="0,10,0,0">
+		<StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Background="#2D2D30" Height="49" Width="329">
+			<Button Content="Add Product" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Height="37" Click="AddProduct_Click">
+				<Button.Resources>
+					<Style TargetType="Border">
+						<Setter Property="CornerRadius" Value="5"/>
+					</Style>
+				</Button.Resources>
+			</Button>
+			<Button Content="Remove Product" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Height="37" Click="RemoveProduct_Click">
+				<Button.Resources>
+					<Style TargetType="Border">
+						<Setter Property="CornerRadius" Value="5"/>
+					</Style>
+				</Button.Resources>
+			</Button>
+			<Button Content="Detailed Report" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Height="37" Click="ShowReport_Click">
+				<Button.Resources>
+					<Style TargetType="Border">
+						<Setter Property="CornerRadius" Value="5"/>
+					</Style>
+				</Button.Resources>
+			</Button>
+		</StackPanel>
+		<ListView x:Name="lstProducts" Background="#2D2D30" Foreground="White" Width="506">
+			<ListView.View>
+				<GridView>
+					<GridViewColumn Header="Section ID" DisplayMemberBinding="{Binding SectionID}" Width="75"/>
+					<GridViewColumn Header="Item Number" DisplayMemberBinding="{Binding ItemNumber}" Width="100"/>
+					<GridViewColumn Header="Group" DisplayMemberBinding="{Binding Grp}" Width="75"/>
+					<GridViewColumn Header="Sold" DisplayMemberBinding="{Binding QuantitySold}" Width="50" />
+					<GridViewColumn Header="Revenue" DisplayMemberBinding="{Binding Revenue}" Width="100" />
+					<GridViewColumn Header="Date Added" Width="100">
+						<GridViewColumn.DisplayMemberBinding>
+							<Binding Path="DatePlaced" StringFormat="{}{0:MM/dd/yyyy}"/>
+						</GridViewColumn.DisplayMemberBinding>
+					</GridViewColumn>
+
+					<!-- Ensure the total of widths matches the ListView width -->
+				</GridView>
+			</ListView.View>
+		</ListView>
+
+
+	</DockPanel>
+</Window>

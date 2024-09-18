@@ -1,0 +1,49 @@
+﻿<UserControl x:Class="Winton.Views.ReportDetailsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" >
+
+	<Grid Margin="20">
+			<!-- Add Delete Button -->
+
+			<ListView x:Name="lstReportDetails" Margin="6,3,14,75" Background="#333333" Foreground="White">
+				<ListView.Resources>
+					<!-- Style for ListViewItem -->
+					<Style TargetType="ListViewItem">
+						<Setter Property="Background" Value="#333333" />
+						<Setter Property="Foreground" Value="White" />
+						<Setter Property="BorderThickness" Value="0"/>
+						<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+						<Setter Property="Padding" Value="10,5" />
+						<Setter Property="FontSize" Value="14"/>
+						<Style.Triggers>
+							<Trigger Property="IsSelected" Value="True">
+								<Setter Property="Background" Value="#444444" />
+								<!-- Change background color when selected -->
+								<Setter Property="Foreground" Value="White" />
+							</Trigger>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter Property="Background" Value="#555555" />
+								<!-- Change background color on hover -->
+								<Setter Property="Foreground" Value="White" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</ListView.Resources>
+				<!-- Define your list view columns here -->
+				<ListView.View>
+					<GridView>
+						<GridViewColumn Header="Item Number" DisplayMemberBinding="{Binding ItemNumber}" Width="150"/>
+						<GridViewColumn Header="Quantity Sold" DisplayMemberBinding="{Binding QuantitySold}" Width="100"/>
+						<GridViewColumn Header="Revenue" DisplayMemberBinding="{Binding Revenue}" Width="150"/>
+						<GridViewColumn Header="Description" DisplayMemberBinding="{Binding Description}" Width="200"/>
+						<GridViewColumn Header="Transaction Code" DisplayMemberBinding="{Binding TransactionCode}" Width="100"/>
+					</GridView>
+				</ListView.View>
+			</ListView>
+
+			<Button Content="Delete Report" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6,0,0,5" Width="108" Click="DeleteReport_Click" Height="46" Background="Transparent" Foreground="White"/>
+			</Grid>
+</UserControl>
