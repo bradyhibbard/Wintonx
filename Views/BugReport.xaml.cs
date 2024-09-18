@@ -26,7 +26,6 @@ namespace Winton.Views
             string stepsToReproduce = StepsTextBox.Text;
             string expectedBehavior = ExpectedTextBox.Text;
             string actualBehavior = ActualTextBox.Text;
-            string environmentInfo = EnvironmentTextBox.Text;
 
             // Check if required fields are filled
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(description))
@@ -37,7 +36,7 @@ namespace Winton.Views
 
             try
             {
-                string responseMessage = await CreateGitHubIssue(title, description, stepsToReproduce, expectedBehavior, actualBehavior, environmentInfo);
+                string responseMessage = await CreateGitHubIssue(title, description, stepsToReproduce, expectedBehavior, actualBehavior);
                 MessageBox.Show(responseMessage, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
@@ -46,7 +45,7 @@ namespace Winton.Views
             }
         }
 
-        private async Task<string> CreateGitHubIssue(string title, string description, string steps, string expected, string actual, string environment)
+        private async Task<string> CreateGitHubIssue(string title, string description, string steps, string expected, string actual)
         {
             using (HttpClient client = new HttpClient())
             {
@@ -58,8 +57,7 @@ namespace Winton.Views
                 string issueBody = $"### Description\n{description}\n\n" +
                                    $"### Steps to Reproduce\n{steps}\n\n" +
                                    $"### Expected Behavior\n{expected}\n\n" +
-                                   $"### Actual Behavior\n{actual}\n\n" +
-                                   $"### Environment Info\n{environment}";
+                                   $"### Actual Behavior\n{actual}\n\n";
 
                 // Set up the issue data
                 var issueData = new
