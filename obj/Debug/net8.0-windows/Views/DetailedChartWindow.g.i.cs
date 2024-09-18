@@ -62,7 +62,7 @@ namespace Winton.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/Winton;V1.0.0.0;component/views/detailedchartwindow.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/Winton;component/views/detailedchartwindow.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\DetailedChartWindow.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

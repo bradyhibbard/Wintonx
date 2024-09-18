@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Winton.Data;
-
+using Winton.Views;
 
 namespace Winton.Views
 {
@@ -41,21 +41,19 @@ namespace Winton.Views
             MessageBox.Show(result, "Database Restore", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // Function to handle Check for Updates
+        // Updated function to handle Check for Updates using the UpdateChecker class
         private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 var updateChecker = new UpdateChecker();
-                string result = await updateChecker.UpdateApplication();
-                MessageBox.Show(result, "Update", MessageBoxButton.OK, MessageBoxImage.Information);
+                string result = await updateChecker.UpdateApplication();  // Call the update logic from the UpdateChecker class
+                MessageBox.Show(result, "Update", MessageBoxButton.OK, MessageBoxImage.Information);  // Display the result of the update check
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during update: {ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Error during update: {ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);  // Show error if any exception occurs
             }
         }
-
-
     }
 }
