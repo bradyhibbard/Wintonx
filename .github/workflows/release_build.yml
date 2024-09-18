@@ -23,8 +23,14 @@ jobs:
     - name: Build the project
       run: dotnet build --configuration Release  # Build the project in Release configuration
 
-    - name: Publish the project
-      run: dotnet publish --configuration Release --output ./publish  # Publish the project
+    # Publish the project as a single file
+    - name: Publish the project as a single file
+      run: |
+        dotnet publish -c Release -r win-x64 --self-contained false /p:PublishSingleFile=true /p:PublishTrimmed=true --output ./publish
+      # Use win-x64 for Windows target. You can replace with linux-x64 or osx-x64 for other platforms.
+      # self-contained=false: The application will not package the .NET runtime (change to true if needed).
+      # PublishSingleFile=true: Ensures the output is a single executable file.
+      # PublishTrimmed=true: This trims unused assemblies to reduce size.
 
     # Zip the published output
     - name: Zip the publish folder
@@ -52,4 +58,4 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}  # Upload to the release created earlier
         asset_path: ./Winton.zip  # Path to the asset
         asset_name: Winton.zip  # Name the asset
-        asset_content_type:
+        asset_content_type: application/zip  # Specify the asset content type as a zip file
