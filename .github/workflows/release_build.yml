@@ -1,0 +1,55 @@
+﻿name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # This will trigger the action on version tags like v1.0.0
+
+jobs:
+  build:
+    runs-on: windows-latest  # Use a Windows runner
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3  # Use the latest version of checkout action
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'  # Specify the .NET version to be used
+
+    - name: Restore dependencies
+      run: dotnet restore  # Restore project dependencies
+
+    - name: Build the project
+      run: dotnet build --configuration Release  # Build the project in Release configuration
+
+    - name: Publish the project
+      run: dotnet publish --configuration Release --output ./publish  # Publish the project
+
+    # Zip the published output
+    - name: Zip the publish folder
+      run: |
+        powershell Compress-Archive -Path ./publish/* -DestinationPath ./Winton.zip  # Compress the publish folder to a zip file
+
+    # Create a GitHub Release
+    - name: Create GitHub Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token from repository secrets
+      with:
+        tag_name: ${{ github.ref_name }}  # Use the tag name (e.g., v1.0.0)
+        release_name: Release ${{ github.ref_name }}  # Name the release based on the tag
+        draft: false
+        prerelease: false
+
+    # Upload release asset (the zipped file)
+    - name: Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token from repository secrets
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}  # Upload to the release created earlier
+        asset_path: ./Winton.zip  # Path to the asset
+        asset_name: Winton.zip  # Name the asset
+        asset_content_type:
