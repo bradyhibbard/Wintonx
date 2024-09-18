@@ -35,7 +35,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include=".github\workflow\release_version.yml" />
+    <None Include=".github\workflows\release_version.yml" />
   </ItemGroup>
 
 
