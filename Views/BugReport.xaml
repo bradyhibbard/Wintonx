@@ -2,33 +2,29 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 	<Grid Height="600" Width="658">
-		<StackPanel Margin="10">
+		<StackPanel Margin="20">
 			<!-- Title -->
 			<TextBlock Text="Title" FontWeight="Normal" Foreground="White" Width="391" Height="24"/>
-			<TextBox x:Name="TitleTextBox" Width="391" Margin="0,5,0,10" Height="27"/>
+			<TextBox x:Name="TitleTextBox" Width="391" Margin="0,0,0,10" Height="27"/>
 
 			<!-- Description -->
 			<TextBlock Text="Description" FontWeight="Normal" Foreground="White" Width="391" Height="23"/>
-			<TextBox x:Name="DescriptionTextBox" Width="390" Height="149" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+			<TextBox x:Name="DescriptionTextBox" Width="390" Height="89" Margin="0,0,0,10" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
 
 			<!-- Steps to Reproduce -->
 			<TextBlock Text="Steps to Reproduce" FontWeight="Normal" Foreground="White" Width="391" Height="23"/>
-			<TextBox x:Name="StepsTextBox" Width="390" Height="100" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+			<TextBox x:Name="StepsTextBox" Width="390" Height="84" Margin="0,0,0,10" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
 
 			<!-- Expected Behavior -->
 			<TextBlock Text="Expected Behavior" FontWeight="Normal" Foreground="White" Width="391" Height="23"/>
-			<TextBox x:Name="ExpectedTextBox" Width="390" Height="50" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+			<TextBox x:Name="ExpectedTextBox" Width="390" Height="32" Margin="0,0,0,10" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
 
 			<!-- Actual Behavior -->
 			<TextBlock Text="Actual Behavior" FontWeight="Normal" Foreground="White" Width="391" Height="23"/>
-			<TextBox x:Name="ActualTextBox" Width="390" Height="50" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
-
-			<!-- Environment Info -->
-			<TextBlock Text="Environment Info (e.g., App version, OS)" FontWeight="Normal" Foreground="White" Width="391" Height="23"/>
-			<TextBox x:Name="EnvironmentTextBox" Width="390" Height="50" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+			<TextBox x:Name="ActualTextBox" Width="390" Height="34" Margin="0,0,0,10" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
 
 			<!-- Send Bug Report Button -->
-			<Button Content="Send Bug Report" Width="144" Margin="0,10,0,0" HorizontalAlignment="Center" Click="SendBugReport_Click" Height="45" Background="Transparent" Foreground="White"/>
+			<Button Content="Send Bug Report" Width="144" Margin="0,15,0,0" HorizontalAlignment="Center" Click="SendBugReport_Click" Height="45" Background="Transparent" Foreground="White"/>
 		</StackPanel>
 	</Grid>
 </UserControl>
