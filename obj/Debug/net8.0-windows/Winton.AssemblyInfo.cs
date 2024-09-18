@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Winton")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b0ccf47702440449b5d8007299c462e4ccd9aafe")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0ea66b81e7de2b228abcf5b271e35aac0b7838f7")]
 [assembly: System.Reflection.AssemblyProductAttribute("Winton")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Winton")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
