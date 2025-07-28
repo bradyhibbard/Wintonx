@@ -1,0 +1,1093 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
+using Winton.Helpers;
+using Winton.Models;
+using Winton.Services;
+
+namespace Winton.Views
+{
+    public partial class EditableSalesFloor : UserControl
+    {
+        // --------------------------------------------------
+        // Constants and State
+        // --------------------------------------------------
+        private const int GridSpacing = 20;
+        private const double DotSize = 5;
+        private const double DotRadius = DotSize / 2;
+        private const double CloseTolerance = 10;
+
+        private bool _isEditNavVisible = false;
+        private bool _isDrawingPerimeter = false;
+        private bool _isDrawingPartition = false;
+        private bool _isSectionsPanelVisible = false;
+        private bool _isEditMode = false;
+        private bool _hasUnsavedChanges = false;
+        public bool _isMoveSave = false;
+        private bool _isClearingCanvas = false;
+
+
+
+
+
+        private readonly SectionManager _sectionManager;
+        private Shape _selectedShape;
+        private List<string> _deletedPartitionIds = new();
+
+
+        // --------------------------------------------------
+        // Dragging Fields for Shapes
+        // --------------------------------------------------
+        private bool _isDragging = false;
+        private Point _dragStart;
+        private TranslateTransform _dragTransform;
+
+        // --------------------------------------------------
+        // Perimeter Drawing State
+        // --------------------------------------------------
+        private readonly List<Point> _perimeterPoints = new();
+        private readonly List<Ellipse> _perimeterDots = new();
+        private Polyline _perimeterLine = new()
+        {
+            Stroke = Brushes.Black,
+            StrokeThickness = 2
+        };
+
+        // --------------------------------------------------
+        // Partition Drawing State
+        // --------------------------------------------------
+        private readonly List<Point> _partitionPoints = new();
+        private readonly List<Ellipse> _partitionDots = new();
+        private Polyline _partitionLine = new()
+        {
+            Stroke = Brushes.Black,
+            StrokeThickness = 2
+        };
+
+        // --------------------------------------------------
+        // Undo Stack (for finalized shapes)
+        // --------------------------------------------------
+        // Instead of storing UIElements directly, store a "FinalizedShape"
+        // that groups a line plus its dots.
+        private readonly Stack<FinalizedShape> _finalizedShapes = new();
+        private List<Partition> _partitions = new();
+
+        // --------------------------------------------------
+        // Context Menu for Perimeter
+        // --------------------------------------------------
+        private ContextMenu _perimeterContextMenu;
+
+        // --------------------------------------------------
+        // Helper class to group finalized shapes
+        // --------------------------------------------------
+        private class FinalizedShape
+        {
+            public List<UIElement> Elements { get; } = new List<UIElement>();
+        }
+
+        public EditableSalesFloor()
+        {
+            InitializeComponent();
+            this.Focusable = true;
+            this.Focus();
+
+            DrawGrid();
+
+            // Add initial perimeter line to the canvas
+            SalesFloorCanvas.Children.Add(_perimeterLine);
+
+            SalesFloorCanvas.MouseLeftButtonDown += SalesFloorCanvas_MouseLeftButtonDown;
+            this.PreviewKeyDown += EditableSalesFloor_PreviewKeyDown;
+            this.PreviewKeyUp += EditableSalesFloor_PreviewKeyUp;
+
+            _sectionManager = new SectionManager(SalesFloorCanvas, this);
+
+            Loaded += async (s, e) =>
+            {
+                this.Focus(); // Ensure focus on load.
+                InitializeCanvas();
+                await LoadSectionsFromDatabaseAsync();
+                await LoadPerimeterFromDatabaseAsync();
+                await LoadPartitionsFromDatabaseAsync();
+            };
+
+            InitializePerimeterContextMenu();
+        }
+
+        private void InitializeCanvas()
+        {
+            Console.WriteLine("Reinitializing canvas elements...");
+
+            DrawGrid();
+
+            // Check and re-add the perimeter line only if it is not already in the canvas
+            if (!SalesFloorCanvas.Children.Contains(_perimeterLine))
+            {
+                SalesFloorCanvas.Children.Add(_perimeterLine);
+            }
+
+            Console.WriteLine("Canvas reinitialized.");
+        }
+
+        private void Help_Click(object sender, RoutedEventArgs e)
+        {
+            var helpWindow = new HelpWindow
+            {
+                Owner = Window.GetWindow(this),
+                Topmost = true
+            };
+            helpWindow.ShowDialog();
+        }
+
+
+        #region Context Menu Setup
+
+        private void InitializePerimeterContextMenu()
+        {
+            _perimeterContextMenu = new ContextMenu();
+
+            MenuItem drawItem = new MenuItem { Header = "Draw" };
+            drawItem.Click += DrawPerimeter_Click;
+
+            MenuItem undoItem = new MenuItem { Header = "Undo" };
+            undoItem.Click += UndoPerimeter_Click;
+
+            MenuItem clearItem = new MenuItem { Header = "Clear" };
+            clearItem.Click += ClearPerimeter_Click;
+
+            _perimeterContextMenu.Items.Add(drawItem);
+            _perimeterContextMenu.Items.Add(undoItem);
+            _perimeterContextMenu.Items.Add(clearItem);
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        private Ellipse CreateDot(Point position, Brush fill)
+        {
+            var dot = new Ellipse
+            {
+                Width = DotSize,
+                Height = DotSize,
+                Fill = fill
+            };
+            Canvas.SetLeft(dot, position.X - DotRadius);
+            Canvas.SetTop(dot, position.Y - DotRadius);
+            return dot;
+        }
+
+        private Point SnapToGrid(Point rawPoint)
+        {
+            double snappedX = Math.Round(rawPoint.X / GridSpacing) * GridSpacing;
+            double snappedY = Math.Round(rawPoint.Y / GridSpacing) * GridSpacing;
+            return new Point(snappedX, snappedY);
+        }
+
+        private bool IsCloseToFirstPerimeter(Point newPoint)
+        {
+            return _perimeterPoints.Any() && (newPoint - _perimeterPoints.First()).Length < CloseTolerance;
+        }
+
+        private bool IsCloseToFirstPartition(Point newPoint)
+        {
+            return _partitionPoints.Any() && (newPoint - _partitionPoints.First()).Length < CloseTolerance;
+        }
+
+        private void DrawGrid()
+        {
+            double width = SalesFloorCanvas.ActualWidth;
+            double height = SalesFloorCanvas.ActualHeight;
+
+            for (int x = 0; x < width; x += GridSpacing)
+            {
+                SalesFloorCanvas.Children.Add(new Line
+                {
+                    X1 = x,
+                    Y1 = 0,
+                    X2 = x,
+                    Y2 = height,
+                    Stroke = Brushes.White,
+                    StrokeThickness = 0.5
+                });
+            }
+
+            for (int y = 0; y < height; y += GridSpacing)
+            {
+                SalesFloorCanvas.Children.Add(new Line
+                {
+                    X1 = 0,
+                    Y1 = y,
+                    X2 = width,
+                    Y2 = y,
+                    Stroke = Brushes.White,
+                    StrokeThickness = 0.5
+                });
+            }
+        }
+
+        #endregion
+
+        #region Event Handlers
+
+        private void EditFloor_Click(object sender, RoutedEventArgs e)
+        {
+            // Toggle Edit Mode
+            _isEditMode = !_isEditMode;
+            _sectionManager.IsEditMode = _isEditMode;
+
+            // Show or hide the Edit Tools Panel
+            EditToolsPanel.Visibility = _isEditMode ? Visibility.Visible : Visibility.Collapsed;
+
+            // 🛠 Change the button text
+            if (sender is Button button)
+            {
+                button.Content = _isEditMode ? "Disable Edit Mode" : "Enable Edit Mode";
+            }
+        }
+
+
+        private void EditableSalesFloor_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (_hasUnsavedChanges)
+            {
+                var result = MessageBox.Show(
+                    "You have unsaved changes. Do you want to save before exiting?",
+                    "Unsaved Changes",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Warning
+                );
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    SaveChangesAsync().Wait();
+                }
+                else if (result == MessageBoxResult.Cancel)
+                {
+                    // Prevent exiting by returning early
+                    return;
+                }
+            }
+
+            // Clear the canvas
+            ClearSectionsFromCanvas();
+            Console.WriteLine("Canvas cleared upon exit.");
+        }
+
+
+
+
+
+        private void ManageProducts_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Opening Manage Products window...");
+        }
+
+        private void Filters_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Applying filters...");
+        }
+
+        private async Task SaveChangesAsync()
+        {
+            if (_isClearingCanvas)
+            {
+                return;
+            }
+
+            try
+            {
+                // 1. Save Sections Before Clearing
+                var sections = SalesFloorCanvas.Children
+                    .OfType<FrameworkElement>()
+                    .Where(e => e.Tag is string tag && tag != "Partition" && tag != "SectionShape")
+                    .ToList();
+
+                foreach (var sectionElement in sections)
+                {
+                    string sectionId = sectionElement.Tag as string;
+                    double x = Canvas.GetLeft(sectionElement);
+                    double y = Canvas.GetTop(sectionElement);
+                    double width = sectionElement.Width;
+                    double height = sectionElement.Height;
+
+                    double rotation = 0;
+                    if (sectionElement.RenderTransform is TransformGroup tg)
+                    {
+                        var rotateTransform = tg.Children.OfType<RotateTransform>().FirstOrDefault();
+                        if (rotateTransform != null)
+                        {
+                            rotation = rotateTransform.Angle;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(sectionId))
+                    {
+                        await CanvasService.UpdateSectionDimensionsAsync(sectionId, x, y, width, height, rotation);
+                        Console.WriteLine($"Section Saved - ID: {sectionId} X: {x}, Y: {y}");
+                    }
+                }
+
+                // Save partitions (deleted partitions are already handled in real time)
+                await CanvasService.SavePartitionsAsync(_partitions, _deletedPartitionIds);
+                _deletedPartitionIds.Clear();
+
+                _hasUnsavedChanges = false;
+
+                MessageBox.Show("Changes saved successfully!", "Debug Info");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error in SaveChangesAsync: {ex.Message}", "Error");
+            }
+        }
+
+
+
+
+
+
+        private async void SaveChanges_Click(object sender, RoutedEventArgs e)
+        {
+            await SaveChangesAsync();
+            MessageBox.Show("Changes saved successfully!");
+        }
+
+
+
+
+        private async void ExitEditMode_Click(object sender, RoutedEventArgs e)
+        {
+            Console.WriteLine("Exiting Edit Mode...");
+
+            // 1. Save changes
+            if (_hasUnsavedChanges)
+            {
+                await SaveChangesAsync();
+                Console.WriteLine("Changes saved.");
+            }
+
+            // 2. Turn off partition drawing mode if active
+            if (_isDrawingPartition)
+            {
+                Console.WriteLine("Turning off partition drawing mode...");
+                FloorDesign_Click(null, null);
+            }
+
+            // 3. Disable editing
+            _isEditMode = false;
+            _isEditNavVisible = false;
+            EditToolsPanel.Visibility = Visibility.Collapsed;
+
+            var editButton = EditToolsPanel.Children
+                .OfType<Button>()
+                .FirstOrDefault(btn => btn.Content.ToString().Contains("Disable Edit Mode"));
+
+            if (editButton != null)
+            {
+                editButton.Content = "Enable Edit Mode";
+            }
+
+            Console.WriteLine("Edit Mode disabled and button text updated.");
+        }
+
+
+
+        private async void ToggleSectionsPanel_Click(object sender, RoutedEventArgs e)
+        {
+
+            _isSectionsPanelVisible = !_isSectionsPanelVisible;
+            SectionsPanel.Visibility = _isSectionsPanelVisible ? Visibility.Visible : Visibility.Collapsed;
+
+            MessageBox.Show("Changes saved. Exiting Edit Mode.");
+        }
+
+        private void AddSquare_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Adding a Square section...");
+        }
+
+        private void AddCircle_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Adding a Circle section...");
+        }
+
+        private void AddTriangle_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Adding a Triangle section...");
+        }
+
+        private void AddCross_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Adding a Cross section...");
+        }
+
+        private void DrawCustomSection_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Entering Custom Drawing Mode...");
+        }
+
+        private void AddSection_Click(object sender, RoutedEventArgs e)
+        {
+            var addSectionsWindow = new AddSectionsWindow
+            {
+                Owner = Window.GetWindow(this),
+                Topmost = true
+            };
+            addSectionsWindow.Show();
+            Application.Current.MainWindow?.Focus();
+        }
+
+        private void RemoveSection_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Remove Section tool activated.");
+        }
+
+        private void MoveSection_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Move Section tool activated.");
+        }
+
+        private void PerimeterButton_Click(object sender, RoutedEventArgs e)
+        {
+            PerimeterButton.ContextMenu = _perimeterContextMenu;
+            _perimeterContextMenu.PlacementTarget = PerimeterButton;
+            _perimeterContextMenu.IsOpen = true;
+        }
+
+        private void DrawPerimeter_Click(object sender, RoutedEventArgs e)
+        {
+            _isDrawingPartition = false;
+            _isDrawingPerimeter = !_isDrawingPerimeter;
+
+            if (_isDrawingPerimeter)
+            {
+                _perimeterPoints.Clear();
+                _perimeterDots.Clear();
+                _perimeterLine.Points.Clear();
+                MessageBox.Show("Click on the canvas to define the store perimeter.");
+                SalesFloorCanvas.Cursor = Cursors.Cross;
+            }
+            else
+            {
+                SalesFloorCanvas.Cursor = Cursors.Arrow;
+            }
+        }
+
+        private void UndoPerimeter_Click(object sender, RoutedEventArgs e)
+        {
+            // Trigger partial undo while drawing.
+            UndoPerimeterPoint();
+        }
+
+        private Partition RemovePartitionAssociatedWithShape(Shape shape)
+        {
+            if (shape is Polyline polyline)
+            {
+                var partitionToRemove = _partitions.FirstOrDefault(p =>
+                    p.Points.Count == polyline.Points.Count &&
+                    p.Points.Zip(polyline.Points, (p1, p2) => (p1 - p2).Length < 1.0).All(x => x)
+                );
+
+                if (partitionToRemove != null)
+                {
+                    _partitions.Remove(partitionToRemove);
+                    return partitionToRemove; // 🛠 Return the removed partition
+                }
+            }
+            return null; // 🛠 Return null if no matching partition found
+        }
+
+
+
+        private async void EditableSalesFloor_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (!_isEditMode) return;
+            _hasUnsavedChanges = true;
+
+
+
+
+            // Ctrl+Z handling
+            if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                // 1) Partial undo if actively drawing perimeter
+                if (_isDrawingPerimeter && _perimeterPoints.Any())
+                {
+                    UndoPerimeterPoint();
+                }
+                // 2) Partial undo if actively drawing partition
+                else if (_isDrawingPartition && _partitionPoints.Any())
+                {
+                    UndoPartitionPoint();
+                }
+                // 3) Otherwise, undo the last finalized shape
+                else if (_finalizedShapes.Any())
+                {
+                    UndoLastFinalizedShape();
+                }
+            }
+            else if (e.Key == Key.Delete && _selectedShape != null)
+            {
+                // Remove from Canvas
+                SalesFloorCanvas.Children.Remove(_selectedShape);
+                _hasUnsavedChanges = true; // Ensure changes get saved
+
+                if (_selectedShape.Tag?.ToString() == "Partition")
+                {
+                    var removedPartition = RemovePartitionAssociatedWithShape(_selectedShape);
+
+                    if (removedPartition != null)
+                    {
+                        // Remove from memory (if not already done)
+                        _partitions.Remove(removedPartition);
+
+                        if (!string.IsNullOrEmpty(removedPartition.Id))
+                        {
+                            // Track for safety so SavePartitionsAsync won't resurrect it
+                            if (!_deletedPartitionIds.Contains(removedPartition.Id))
+                                _deletedPartitionIds.Add(removedPartition.Id);
+
+                            // Also delete immediately from DB
+                            await CanvasService.DeletePartitionAsync(removedPartition.Id);
+                            Console.WriteLine($"Partition {removedPartition.Id} deleted via Delete key.");
+                        }
+                    }
+                }
+                else if (_selectedShape.Tag?.ToString() == "SectionButton")
+                {
+                    // Future: handle section deletion if needed
+                }
+
+                _selectedShape = null;
+            }
+
+
+        }
+
+
+        private async void EditableSalesFloor_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            // Finalize partition when Shift is released
+            if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) && _isDrawingPartition)
+            {
+                if (_partitionPoints.Any())
+                {
+                    // Create a new Partition from the current drawing
+                    var partition = new Partition();
+                    partition.Points.AddRange(_partitionPoints);
+                    _partitions.Add(partition);
+                }
+
+                // Finalize the partition drawing by pushing to the undo stack.
+                var finalized = new FinalizedShape();
+                finalized.Elements.Add(_partitionLine);
+                finalized.Elements.AddRange(_partitionDots);
+                _finalizedShapes.Push(finalized);
+
+                // Clear the local drawing state for partition.
+                _partitionPoints.Clear();
+                _partitionDots.Clear();
+
+                // Create a fresh Polyline for future partition drawing.
+                _partitionLine = new Polyline
+                {
+                    Stroke = Brushes.Black,
+                    StrokeThickness = 2
+                };
+                SalesFloorCanvas.Children.Add(_partitionLine);
+                SalesFloorCanvas.Cursor = Cursors.Cross;
+
+                // Save partitions to the database.
+                await CanvasService.SavePartitionsAsync(_partitions, new List<string>());
+            }
+        }
+
+        private void SalesFloorCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isEditMode) return;
+            _hasUnsavedChanges = true;
+
+            Point clickedPoint = SnapToGrid(e.GetPosition(SalesFloorCanvas));
+
+            // Clear selection if clicking on empty space
+            var clickedElement = e.OriginalSource as FrameworkElement;
+            if (clickedElement == SalesFloorCanvas)
+            {
+                _sectionManager.ClearSelection();
+            }
+
+            if (_isDrawingPerimeter)
+                HandlePerimeterDrawing(clickedPoint);
+            else if (_isDrawingPartition)
+                HandlePartitionDrawing(clickedPoint);
+        }
+
+
+        // NEW or Modified: Shape event handlers to support double-click editing and dragging.
+        public void Shape_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isEditMode) return;
+
+            Shape shape = null;
+            Button button = null;
+
+            if (sender is Button btn && btn.Content is Shape wrappedShape)
+            {
+                button = btn;          // Keep the Button for editing
+                shape = wrappedShape;  // Still track the shape for highlighting
+            }
+            else if (sender is Shape s)
+            {
+                shape = s;
+
+                // Check if this Shape is inside a Button (its Parent might be a Button)
+                if (s.Parent is Button parentBtn)
+                {
+                    button = parentBtn;
+                }
+            }
+
+            if (shape == null) return;
+
+            // Handle double-click
+            if (e.ClickCount == 2)
+            {
+                if (shape.Tag?.ToString() == "SectionButton")
+                {
+                    // Always pass the Button (or fallback to the shape if no button exists)
+                    var shapeElement = (button != null) ? (FrameworkElement)button : shape;
+
+                    var editWindow = new AddSectionsWindow(shapeElement)
+                    {
+                        Owner = Window.GetWindow(this)
+                    };
+                    editWindow.Show();
+                }
+                return;
+            }
+
+            // Deselect the previous shape (remove highlight)
+            if (_selectedShape != null)
+            {
+                _selectedShape.Stroke = Brushes.Black;
+                _selectedShape.StrokeThickness = 2;
+            }
+
+            // Set the new selected shape
+            _selectedShape = shape;
+
+            // Highlight the new selected shape
+            _selectedShape.Stroke = Brushes.DeepSkyBlue;
+            _selectedShape.StrokeThickness = 3;
+
+            // Enable dragging only for Section Buttons
+            if (_selectedShape.Tag?.ToString() == "SectionButton")
+            {
+                _dragStart = e.GetPosition(SalesFloorCanvas);
+
+                _dragTransform = _selectedShape.RenderTransform as TranslateTransform;
+                if (_dragTransform == null)
+                {
+                    _dragTransform = new TranslateTransform();
+                    _selectedShape.RenderTransform = _dragTransform;
+                }
+
+                _isDragging = true;
+                _selectedShape.CaptureMouse();
+            }
+            else
+            {
+                _isDragging = false;
+            }
+        }
+
+
+
+
+
+        public void Shape_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDragging && _selectedShape != null)
+            {
+                Point currentPos = e.GetPosition(SalesFloorCanvas);
+                double offsetX = currentPos.X - _dragStart.X;
+                double offsetY = currentPos.Y - _dragStart.Y;
+                _dragTransform.X += offsetX;
+                _dragTransform.Y += offsetY;
+                _dragStart = currentPos;
+            }
+        }
+
+        public void Shape_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDragging && _selectedShape != null)
+            {
+                _isDragging = false;
+                _selectedShape.ReleaseMouseCapture();
+                _selectedShape = null;
+            }
+        }
+
+        #endregion
+
+        #region Drawing Logic
+
+        private void HandlePerimeterDrawing(Point clickedPoint)
+        {
+            _hasUnsavedChanges = true;
+
+            _perimeterPoints.Add(clickedPoint);
+            _perimeterLine.Points.Add(clickedPoint);
+
+            var dot = CreateDot(clickedPoint, Brushes.Red);
+            SalesFloorCanvas.Children.Add(dot);
+            _perimeterDots.Add(dot);
+
+            // If the user closes the perimeter (clicking near the first point):
+            if (_perimeterPoints.Count > 2 && IsCloseToFirstPerimeter(clickedPoint))
+            {
+                // Close the shape visually.
+                _perimeterLine.Points.Add(_perimeterPoints.First());
+                _isDrawingPerimeter = false;
+                SalesFloorCanvas.Cursor = Cursors.Arrow;
+
+                MessageBox.Show("Perimeter completed!");
+                _ = SavePerimeterToDatabaseAsync();
+
+                // Finalize the perimeter shape.
+                var finalized = new FinalizedShape();
+                finalized.Elements.Add(_perimeterLine);
+                finalized.Elements.AddRange(_perimeterDots);
+                _finalizedShapes.Push(finalized);
+
+                // Clear local lists so partial undo no longer applies.
+                _perimeterPoints.Clear();
+                _perimeterDots.Clear();
+
+                // Optionally, create a new perimeter line for additional perimeters.
+                _perimeterLine = new Polyline
+                {
+                    Stroke = Brushes.Black,
+                    StrokeThickness = 2
+                };
+                SalesFloorCanvas.Children.Add(_perimeterLine);
+            }
+        }
+
+        private void HandlePartitionDrawing(Point clickedPoint)
+        {
+            _hasUnsavedChanges = true;
+
+            bool multiPoint = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+            var dot = CreateDot(clickedPoint, Brushes.Blue);
+
+            if (multiPoint)
+            {
+                _partitionPoints.Add(clickedPoint);
+                _partitionLine.Points.Add(clickedPoint);
+                SalesFloorCanvas.Children.Add(dot);
+                _partitionDots.Add(dot);
+
+                // Optionally, if the user clicks near the first point while holding Shift, you could close the shape.
+                if (_partitionPoints.Count > 2 && IsCloseToFirstPartition(clickedPoint))
+                {
+                    _partitionLine.Points.Add(_partitionPoints.First());
+                }
+            }
+            else
+            {
+                if (_partitionPoints.Count == 0)
+                {
+                    _partitionPoints.Add(clickedPoint);
+                    _partitionLine.Points.Add(clickedPoint);
+                    SalesFloorCanvas.Children.Add(dot);
+                    _partitionDots.Add(dot);
+                }
+                else if (_partitionPoints.Count == 1)
+                {
+                    _partitionPoints.Add(clickedPoint);
+                    _partitionLine.Points.Add(clickedPoint);
+                    SalesFloorCanvas.Children.Add(dot);
+                    _partitionDots.Add(dot);
+
+                    // Immediately finalize the line after 2 points if desired.
+                    _partitionPoints.Clear();
+                    _partitionDots.Clear();
+
+                    var finalized = new FinalizedShape();
+                    finalized.Elements.Add(_partitionLine);
+                    finalized.Elements.Add(dot);
+                    _finalizedShapes.Push(finalized);
+
+                    // Create a new partition line for future drawing
+                    _partitionLine = new Polyline
+                    {
+                        Stroke = Brushes.Black,
+                        StrokeThickness = 2
+                    };
+
+                    // 🆕 ADD these two lines to make partitions selectable:
+                    _partitionLine.Tag = "Partition";
+                    _partitionLine.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
+
+                    SalesFloorCanvas.Children.Add(_partitionLine);
+                }
+            }
+        }
+
+
+        // Partial Undo for Perimeter
+        private void UndoPerimeterPoint()
+        {
+            if (_perimeterPoints.Any())
+            {
+                _perimeterPoints.RemoveAt(_perimeterPoints.Count - 1);
+                _perimeterLine.Points.RemoveAt(_perimeterLine.Points.Count - 1);
+
+                if (_perimeterDots.Any())
+                {
+                    SalesFloorCanvas.Children.Remove(_perimeterDots.Last());
+                    _perimeterDots.RemoveAt(_perimeterDots.Count - 1);
+                }
+            }
+        }
+
+        // Partial Undo for Partition
+        private void UndoPartitionPoint()
+        {
+            if (_partitionPoints.Any())
+            {
+                _partitionPoints.RemoveAt(_partitionPoints.Count - 1);
+                _partitionLine.Points.RemoveAt(_partitionLine.Points.Count - 1);
+
+                if (_partitionDots.Any())
+                {
+                    SalesFloorCanvas.Children.Remove(_partitionDots.Last());
+                    _partitionDots.RemoveAt(_partitionDots.Count - 1);
+                }
+            }
+        }
+
+        // Full Undo for the last finalized shape
+        private async void UndoLastFinalizedShape()
+        {
+            if (!_finalizedShapes.Any()) return;
+
+            var shapeGroup = _finalizedShapes.Pop();
+            _hasUnsavedChanges = true; // Ensure we trigger a save when exiting or saving
+
+            var partitionLine = shapeGroup.Elements
+                                           .OfType<Polyline>()
+                                           .FirstOrDefault(l => l.Tag?.ToString() == "Partition");
+
+            if (partitionLine != null)
+            {
+                var partitionToRemove = _partitions.FirstOrDefault(p =>
+                    p.Points.Count == partitionLine.Points.Count &&
+                    p.Points.Zip(partitionLine.Points, (p1, p2) => (p1 - p2).Length < 1.0).All(x => x));
+
+                if (partitionToRemove != null)
+                {
+                    _partitions.Remove(partitionToRemove);
+
+                    if (!string.IsNullOrEmpty(partitionToRemove.Id))
+                    {
+                        _deletedPartitionIds.Add(partitionToRemove.Id);
+                        await CanvasService.DeletePartitionAsync(partitionToRemove.Id);
+                        Console.WriteLine($"Partition {partitionToRemove.Id} deleted via Ctrl+Z.");
+                    }
+                }
+            }
+
+            foreach (var element in shapeGroup.Elements)
+            {
+                SalesFloorCanvas.Children.Remove(element);
+            }
+        }
+
+
+
+
+        private async void ClearPerimeter_Click(object sender, RoutedEventArgs e)
+        {
+
+            MessageBoxResult result = MessageBox.Show(
+                "Are you sure you want to clear the entire sales floor layout?",
+                "Confirm Clear",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                ClearPerimeter();
+                await CanvasService.SavePerimeterAsync(_perimeterPoints);
+                MessageBox.Show("Perimeter cleared.");
+            }
+        }
+
+        private void ClearPerimeter()
+        {
+
+            _hasUnsavedChanges = true;
+
+            _perimeterPoints.Clear();
+            _perimeterLine.Points.Clear();
+
+            foreach (var dot in _perimeterDots)
+                SalesFloorCanvas.Children.Remove(dot);
+
+            _perimeterDots.Clear();
+        }
+
+        #endregion
+
+        #region Database Interaction
+
+        private async Task SavePerimeterToDatabaseAsync()
+        {
+            await CanvasService.SavePerimeterAsync(_perimeterPoints);
+        }
+
+        private async Task LoadPerimeterFromDatabaseAsync()
+        {
+            List<Point> loadedPoints = await CanvasService.LoadPerimeterAsync();
+            _perimeterPoints.Clear();
+            _perimeterLine.Points.Clear();
+
+            foreach (Point pt in loadedPoints)
+            {
+                _perimeterPoints.Add(pt);
+                _perimeterLine.Points.Add(pt);
+            }
+        }
+
+        private void ClearSectionsFromCanvas()
+        {
+            _isClearingCanvas = true;
+
+            // Remove all children from the canvas
+            SalesFloorCanvas.Children.Clear();
+
+            _isClearingCanvas = false;
+        }
+
+
+
+        private async Task LoadSectionsFromDatabaseAsync()
+        {
+
+            var sections = await CanvasService.LoadSectionsAsync();
+            Console.WriteLine($"Loading {sections.Count} sections from the database.");
+
+            foreach (var section in sections)
+            {
+
+                await _sectionManager.AddShapeToCanvasAsync(
+                    shapeName: section.name,
+                    shapeType: section.shapeType ?? section.name,
+                    x: section.x,
+                    y: section.y,
+                    width: section.width,
+                    height: section.height,
+                    rotation: section.rotation,
+                    existingSectionId: section.sectionId,
+                    wrapAsButton: false);
+            }
+        }
+
+
+        private async Task LoadPartitionsFromDatabaseAsync()
+        {
+            List<Partition> loadedPartitions = await CanvasService.LoadPartitionsAsync();
+
+            foreach (var partition in loadedPartitions)
+            {
+                var partitionLine = new Polyline
+                {
+                    Stroke = Brushes.Black,
+                    StrokeThickness = 1
+                };
+
+                foreach (var pt in partition.Points)
+                {
+                    partitionLine.Points.Add(pt);
+                }
+
+                // 🆕 Tag and wire up click to make loaded partitions selectable:
+                partitionLine.Tag = "Partition";
+                partitionLine.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
+
+
+                SalesFloorCanvas.Children.Add(partitionLine);
+                _partitions.Add(partition);
+            }
+        }
+
+
+        #endregion
+
+        #region Floor Design Mode
+
+        private void FloorDesign_Click(object sender, RoutedEventArgs e)
+        {
+            _isDrawingPerimeter = false;
+            _isDrawingPartition = !_isDrawingPartition;
+
+
+            if (_isDrawingPartition)
+            {
+                _partitionPoints.Clear();
+                _partitionDots.Clear();
+                _partitionLine.Points.Clear();
+
+                if (!SalesFloorCanvas.Children.Contains(_partitionLine))
+                    SalesFloorCanvas.Children.Add(_partitionLine);
+
+                SalesFloorCanvas.Cursor = Cursors.Cross;
+                MessageBox.Show("Floor Design mode activated. Click on the canvas to draw partition walls. Hold Shift for multi-point segments.");
+            }
+            else
+            {
+                SalesFloorCanvas.Cursor = Cursors.Arrow;
+                MessageBox.Show("Floor Design mode deactivated.");
+            }
+        }
+
+        #endregion
+
+        #region Async Shape Addition
+
+        public async Task AddShapeToCanvasAsync(
+            string name,
+            double x = 100,
+            double y = 100,
+            double width = 50,
+            double height = 50,
+            double rotation = 0,
+            string existingSectionId = null,
+            string shapeType = null,
+            bool wrapAsButton = false)
+        {
+            string finalShapeType = shapeType ?? name;
+            await _sectionManager.AddShapeToCanvasAsync(
+                shapeName: name,
+                shapeType: finalShapeType,
+                x: x,
+                y: y,
+                width: width,
+                height: height,
+                rotation: rotation,
+                existingSectionId: existingSectionId,
+                wrapAsButton: wrapAsButton);
+        }
+
+        #endregion
+    }
+}

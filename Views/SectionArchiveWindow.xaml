@@ -1,0 +1,32 @@
+﻿<Window x:Class="Winton.Views.SectionArchiveWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Section Archive" Height="500" Width="600">
+	<Grid>
+		<StackPanel Margin="10">
+			<TextBlock Text="Section Archive" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+			<ListBox x:Name="ArchiveListBox" Height="200" SelectionMode="Single" SelectionChanged="ArchiveListBox_SelectionChanged">
+				<ListBox.ItemTemplate>
+					<DataTemplate>
+						<StackPanel Orientation="Horizontal">
+							<TextBlock Text="{Binding ItemNumber}" Width="150"/>
+							<TextBlock Text="{Binding DatePlaced, StringFormat='Date Added: {0:d}'}" Width="150"/>
+							<TextBlock Text="{Binding DateRemoved, StringFormat='Date Removed: {0:d}'}" Width="150"/>
+							<TextBlock Text="{Binding Revenue, StringFormat='Revenue: ${0:F2}'}" Width="100"/>
+						</StackPanel>
+					</DataTemplate>
+				</ListBox.ItemTemplate>
+			</ListBox>
+
+
+			<TextBlock Text="Date Added" FontSize="12" Margin="0,10,0,0"/>
+			<DatePicker x:Name="DateAddedPicker" Margin="0,5,0,10"/>
+
+			<TextBlock Text="Date Removed" FontSize="12" Margin="0,10,0,0"/>
+			<DatePicker x:Name="DateRemovedPicker" Margin="0,5,0,10"/>
+
+			<Button Content="Save Dates" Click="SaveDatesButton_Click" Margin="0,10,0,0"/>
+			<Button Content="Close" Click="CloseButton_Click" Margin="0,10,0,0"/>
+		</StackPanel>
+	</Grid>
+</Window>

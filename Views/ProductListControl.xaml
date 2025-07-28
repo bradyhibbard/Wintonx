@@ -1,0 +1,64 @@
+﻿<UserControl x:Class="Winton.Views.ProductListControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Winton.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="Auto"/>
+			<!-- New row for buttons -->
+		</Grid.RowDefinitions>
+
+		<Label Content="{Binding ElementName=ProductListView, Path=Items.Count, StringFormat='Product List Count: {0}'}"
+            FontSize="16" FontWeight="Bold" Padding="10" HorizontalAlignment="Center" Grid.Row="0" Foreground="White"/>
+
+		<ListView x:Name="ProductListView" Margin="10" Grid.Row="1" ItemsSource="{Binding Products}" Background="#333333" Foreground="White">
+			<ListView.Resources>
+				<!-- Style for ListViewItem -->
+				<Style TargetType="ListViewItem">
+					<Setter Property="Background" Value="#333333" />
+					<Setter Property="Foreground" Value="White" />
+					<Setter Property="BorderThickness" Value="0"/>
+					<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+					<Setter Property="Padding" Value="10,5" />
+					<Setter Property="FontSize" Value="14"/>
+					<Style.Triggers>
+						<Trigger Property="IsSelected" Value="True">
+							<Setter Property="Background" Value="#444444" />
+							<!-- Change background color when selected -->
+							<Setter Property="Foreground" Value="White" />
+						</Trigger>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter Property="Background" Value="#555555" />
+							<!-- Change background color on hover -->
+							<Setter Property="Foreground" Value="White" />
+						</Trigger>
+					</Style.Triggers>
+				</Style>
+			</ListView.Resources>
+
+			<ListView.View>
+				<GridView>
+					<GridViewColumn Header="ID" DisplayMemberBinding="{Binding ProductID}" Width="Auto"/>
+					<GridViewColumn Header="Item Name" DisplayMemberBinding="{Binding ItemName}" Width="Auto"/>
+					<GridViewColumn Header="Item Number" DisplayMemberBinding="{Binding ItemNumber}" Width="Auto"/>
+					<GridViewColumn Header="Vendor" DisplayMemberBinding="{Binding Vendor}" Width="Auto"/>
+					<GridViewColumn Header="Category" DisplayMemberBinding="{Binding Cat}" Width="Auto"/>
+					<GridViewColumn Header="Group" DisplayMemberBinding="{Binding Grp}" Width="Auto"/>
+				</GridView>
+			</ListView.View>
+		</ListView>
+
+		<!-- Buttons at the bottom -->
+		<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,10" Grid.Row="2">
+			<Button Content="Import Product List" Width="150" Height="40" Margin="10,0" Click="ImportProductList_Click" Background="Transparent" Foreground="White"/>
+			<Button Content="Delete Product List" Width="150" Height="40" Margin="10,0" Click="DeleteProductList_Click" Background="Transparent" Foreground="White"/>
+		</StackPanel>
+
+	</Grid>
+</UserControl>

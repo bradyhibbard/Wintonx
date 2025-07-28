@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+    <PropertyGroup>
+	    <OutputType>WinExe</OutputType>
+	    <TargetFramework>net8.0-windows</TargetFramework>
+	    <Nullable>enable</Nullable>
+	    <ImplicitUsings>enable</ImplicitUsings>
+	    <UseWPF>true</UseWPF>
+	    <SelfContained>true</SelfContained>
+	    <PublishSingleFile>true</PublishSingleFile>
+	    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+	    <PublishDir>C:\Users\sbhib\source\repos\Winton\Winton\Published\</PublishDir>
+    </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\Couch.jpg" />
+    <None Remove="Assets\SF2.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+	<Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="LiveCharts" Version="0.9.7" />
+    <PackageReference Include="LiveCharts.Wpf" Version="0.9.7" />
+    <PackageReference Include="Microsoft-WindowsAPICodePack-Shell" Version="1.1.5" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Windows.Compatibility" Version="9.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="NPOI" Version="2.7.2" />
+    <PackageReference Include="squirrel.windows" Version="2.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Couch.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\SF2.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include=".github\workflows\release_build.yml" />
+  </ItemGroup>
+
+
+
+</Project>

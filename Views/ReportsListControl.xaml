@@ -1,0 +1,53 @@
+﻿<UserControl x:Class="Winton.Views.ReportsListControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Winton.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<ListView x:Name="lstReports" MouseDoubleClick="LstReports_MouseDoubleClick" Background="#333333" Foreground="White" Grid.Row="0">
+			<ListView.Resources>
+				<!-- Style for ListViewItem -->
+				<Style TargetType="ListViewItem">
+					<Setter Property="Background" Value="#333333" />
+					<Setter Property="Foreground" Value="White" />
+					<Setter Property="BorderThickness" Value="0"/>
+					<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+					<Setter Property="Padding" Value="10,5" />
+					<Setter Property="FontSize" Value="14"/>
+					<Style.Triggers>
+						<Trigger Property="IsSelected" Value="True">
+							<Setter Property="Background" Value="#444444" />
+							<Setter Property="Foreground" Value="White" />
+						</Trigger>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter Property="Background" Value="#555555" />
+							<Setter Property="Foreground" Value="White" />
+						</Trigger>
+					</Style.Triggers>
+				</Style>
+			</ListView.Resources>
+
+			<!-- Define your list view columns here -->
+			<ListView.View>
+				<GridView>
+					<GridViewColumn Header="Report Date" DisplayMemberBinding="{Binding DisplayDate}" Width="250"/>
+				</GridView>
+			</ListView.View>
+		</ListView>
+
+		<!-- Buttons at the bottom -->
+		<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="10" Grid.Row="1">
+			<Button Content="Add Sales Report" Width="150" Margin="5" Click="AddSalesReport_Click" Background="Transparent" Foreground="White" BorderBrush="White" BorderThickness="1" Height="47"/>
+			<Button Content="Delete Sales Report" Width="150" Margin="5" Click="DeleteSalesReport_Click" Background="Transparent" Foreground="White" BorderBrush="White" BorderThickness="1"/>
+		</StackPanel>
+	</Grid>
+</UserControl>
+

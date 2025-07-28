@@ -1,0 +1,69 @@
+﻿<UserControl x:Class="Winton.Views.FilterControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="800">
+	<Grid Background="White">
+		<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Margin="10,10,10,0" Height="589" VerticalAlignment="Top">
+			<StackPanel x:Name="FilterStackPanel">
+				<Expander Header="Sales Metrics">
+					<StackPanel>
+						<CheckBox x:Name="RevenueCheckbox" Content="Revenue" Margin="5" Foreground="Black" Checked="RevenueCheckbox_Checked" Unchecked="RevenueCheckbox_Unchecked"/>
+						<CheckBox Content="Quantity Sold" Margin="5" Foreground="Black"/>
+					</StackPanel>
+				</Expander>
+				<Expander Header="Product Categories">
+					<StackPanel>
+						<CheckBox x:Name="UpholsteryCheckbox" Content="Upholstery" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="UpholsteryGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="PatioCheckbox" Content="Patio" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="PatioGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="OfficeCheckbox" Content="Office" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="OfficeGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="OccasionalTablesCheckbox" Content="Occasional Tables" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="OccasionalTablesGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="MattressesCheckbox" Content="Mattresses" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="MattressesGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="EntertainmentCheckbox" Content="Entertainment" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="EntertainmentGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="BedroomCheckbox" Content="Bedroom" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="BedroomGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="DiningCheckbox" Content="Dining" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="DiningGroups" Margin="10,0,0,0"/>
+						<CheckBox x:Name="AccessoriesCheckbox" Content="Accessories" Margin="5" Foreground="Black" Checked="Category_Checked" Unchecked="Category_Unchecked"/>
+						<StackPanel x:Name="AccessoriesGroups" Margin="10,0,0,0"/>
+					</StackPanel>
+				</Expander>
+				<Expander Header="Brands">
+					<StackPanel>
+						<CheckBox Content="Flexsteel" Margin="5" Foreground="Black"/>
+						<CheckBox Content="Ashley" Margin="5" Foreground="Black"/>
+						<CheckBox Content="Other" Margin="5" Foreground="Black"/>
+					</StackPanel>
+				</Expander>
+				<Expander Header="Tags">
+					<StackPanel>
+						<TextBox x:Name="TagInput" Margin="5"/>
+						<Button Content="Add Tag" Click="AddTag_Click" Margin="5"/>
+						<ItemsControl x:Name="TagList"/>
+					</StackPanel>
+				</Expander>
+				<Expander Header="Date Range">
+					<StackPanel>
+						<TextBlock Text="Start Date" Margin="5" Foreground="Black"/>
+						<DatePicker x:Name="StartDatePicker" Margin="5"/>
+						<TextBlock Text="End Date" Margin="5" Foreground="Black"/>
+						<DatePicker x:Name="EndDatePicker" Margin="5"/>
+					</StackPanel>
+				</Expander>
+				<StackPanel Orientation="Horizontal">
+					<Button Content="Save" Click="SaveFilters_Click" Margin="5" Width="67" Background="Transparent"/>
+					<Button Content="Cancel" Click="CancelFilters_Click" Margin="5" Width="67" Background="Transparent"/>
+					<Button Content="Clear Filter" Click="ClearFilters_Click" Margin="5" Width="67" Background="Transparent"/>
+				</StackPanel>
+			</StackPanel>
+		</ScrollViewer>
+	</Grid>
+</UserControl>
