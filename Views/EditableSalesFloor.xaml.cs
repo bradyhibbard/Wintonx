@@ -433,16 +433,35 @@ namespace Winton.Views
             MessageBox.Show("Entering Custom Drawing Mode...");
         }
 
-        private void AddSection_Click(object sender, RoutedEventArgs e)
+        // EditableSalesFloor.xaml.cs
+        private async void AddSection_Click(object sender, RoutedEventArgs e)
         {
-            var addSectionsWindow = new AddSectionsWindow
+            // 1) Create the shape on the canvas:
+            await AddShapeToCanvasAsync(
+                name: "Square",
+                x: 100, y: 100,
+                width: 50, height: 50,
+                rotation: 0,
+                existingSectionId: null,
+                wrapAsButton: false);
+
+            // 2) Find it by Tag (new GUID) or by last child:
+            var shape = SalesFloorCanvas.Children
+                .OfType<Shape>()
+                .LastOrDefault(s => s.Tag is string id /* and match your new ID logic */);
+
+            if (shape == null) return;
+
+            // 3) Hand it off to the editor as the “selected” shape:
+            var editWindow = new AddSectionsWindow(shape)
             {
                 Owner = Window.GetWindow(this),
                 Topmost = true
             };
-            addSectionsWindow.Show();
+            editWindow.Show();
             Application.Current.MainWindow?.Focus();
         }
+
 
         private void RemoveSection_Click(object sender, RoutedEventArgs e)
         {

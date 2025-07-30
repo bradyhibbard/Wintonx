@@ -337,29 +337,58 @@ namespace Winton.Services
                 {
                     await connection.OpenAsync();
 
-                    string query = @"
-                INSERT INTO Archive (ProductID, SectionID, ItemNumber, DatePlaced, DateRemoved, QuantitySold, Revenue)
-                SELECT pp.ProductID, pp.SectionID, p.ItemNumber, pp.DatePlaced, pp.DateRemoved, @QuantitySold, @Revenue
-                FROM ProductPlacements pp
-                INNER JOIN Products p ON pp.ProductID = p.ProductID
-                WHERE pp.ProductID = @ProductID AND pp.SectionID = @SectionID";
-
-                    using (var command = new SqliteCommand(query, connection))
+                    using (var transaction = connection.BeginTransaction())
                     {
-                        command.Parameters.AddWithValue("@ProductID", productId);
-                        command.Parameters.AddWithValue("@SectionID", sectionId);
-                        command.Parameters.AddWithValue("@QuantitySold", quantitySold);
-                        command.Parameters.AddWithValue("@Revenue", revenue);
+                        try
+                        {
+                            // Archive the placement by copying it into the Archive table
+                            string insertQuery = @"
+                        INSERT INTO Archive (ProductID, SectionID, ItemNumber, DatePlaced, DateRemoved, QuantitySold, Revenue, RemovalNotes)
+                        SELECT pp.ProductID, pp.SectionID, p.ItemNumber, pp.DatePlaced, @DateRemoved, @QuantitySold, @Revenue, @RemovalNotes
+                        FROM ProductPlacements pp
+                        INNER JOIN Products p ON pp.ProductID = p.ProductID
+                        WHERE pp.ProductID = @ProductID AND pp.SectionID = @SectionID";
 
-                        await command.ExecuteNonQueryAsync();
+                            using (var insertCommand = new SqliteCommand(insertQuery, connection, transaction))
+                            {
+                                insertCommand.Parameters.AddWithValue("@ProductID", productId);
+                                insertCommand.Parameters.AddWithValue("@SectionID", sectionId);
+                                insertCommand.Parameters.AddWithValue("@DateRemoved", DateTime.UtcNow);  // Ensure removal timestamp is included
+                                insertCommand.Parameters.AddWithValue("@QuantitySold", quantitySold);
+                                insertCommand.Parameters.AddWithValue("@Revenue", revenue);
+                                insertCommand.Parameters.AddWithValue("@RemovalNotes", removalNotes ?? "Removed manually");
+
+                                await insertCommand.ExecuteNonQueryAsync();
+                            }
+
+                            // Remove the product from active placements
+                            string deleteQuery = @"
+                        DELETE FROM ProductPlacements 
+                        WHERE ProductID = @ProductID AND SectionID = @SectionID";
+
+                            using (var deleteCommand = new SqliteCommand(deleteQuery, connection, transaction))
+                            {
+                                deleteCommand.Parameters.AddWithValue("@ProductID", productId);
+                                deleteCommand.Parameters.AddWithValue("@SectionID", sectionId);
+                                await deleteCommand.ExecuteNonQueryAsync();
+                            }
+
+                            await transaction.CommitAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            await transaction.RollbackAsync();
+                            Console.WriteLine($"Error archiving product placement: {ex.Message}");
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error archiving product placement: {ex.Message}");
+                Console.WriteLine($"Error in ArchiveProductPlacementAsync: {ex.Message}");
             }
         }
+
 
 
         public static async Task ArchiveAndDeleteSectionAsync(string sectionId)

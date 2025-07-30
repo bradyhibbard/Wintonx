@@ -57,22 +57,66 @@ namespace Winton.Views
             {
                 shapeWidth = _selectedShape.Width;
                 shapeHeight = _selectedShape.Height;
-                rotationAngle = (_selectedShape.RenderTransform as RotateTransform)?.Angle ?? 0;
+                rotationAngle = 0;
+
+                if (_selectedShape.RenderTransform is RotateTransform rotate)
+                    rotationAngle = rotate.Angle;
+                else if (_selectedShape.RenderTransform is TransformGroup tg)
+                {
+                    var rotateTransform = tg.Children.OfType<RotateTransform>().FirstOrDefault();
+                    if (rotateTransform != null)
+                        rotationAngle = rotateTransform.Angle;
+                }
 
                 WidthSlider.Value = shapeWidth;
                 HeightSlider.Value = shapeHeight;
                 RotationSlider.Value = rotationAngle;
+
+                // Build a clone for the PreviewCanvas so the user sees the current shape
+                PreviewCanvas.Children.Clear();
+
+                if (_selectedShape is Rectangle)
+                    previewShape = new Rectangle();
+                else if (_selectedShape is Ellipse)
+                    previewShape = new Ellipse();
+                else if (_selectedShape is Polygon poly)
+                    previewShape = new Polygon { Points = new PointCollection(poly.Points) };
+                else if (_selectedShape is Path path)
+                    previewShape = new Path { Data = path.Data.Clone() };
+
+                previewShape.Width = shapeWidth;
+                previewShape.Height = shapeHeight;
+                previewShape.Stroke = Brushes.White;
+                previewShape.StrokeThickness = 1;
+                previewShape.Fill = Brushes.Transparent;
+                previewShape.RenderTransform = new RotateTransform(rotationAngle, shapeWidth / 2, shapeHeight / 2);
+
+                PreviewCanvas.Children.Add(previewShape);
+            }
+            else
+            {
+                InitializePreview(); // For new shapes, keep old behavior
             }
         }
+
 
         private void UpdatePreview()
         {
             if (previewShape == null) return;
 
+            // Update size
             previewShape.Width = shapeWidth;
             previewShape.Height = shapeHeight;
-            previewShape.RenderTransform = new RotateTransform(rotationAngle, shapeWidth / 5, shapeHeight / 5);
+
+            // Center pivot for rotation relative to the shape's actual size
+            double centerX = previewShape.Width / 2;
+            double centerY = previewShape.Height / 2;
+
+            previewShape.RenderTransform = new RotateTransform(rotationAngle, centerX, centerY);
+
+            previewShape.InvalidateVisual(); // Force a redraw
         }
+
 
         private void AddSquare_Click(object sender, RoutedEventArgs e) => SelectShape("Square");
         private void AddCircle_Click(object sender, RoutedEventArgs e) => SelectShape("Circle");
@@ -149,84 +193,73 @@ namespace Winton.Views
 
         private void WidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            shapeWidth = e.NewValue; // Always keep shapeWidth in sync
+
             if (_selectedShape != null)
             {
-                double newWidth = e.NewValue;
-
-                // If the shape is inside a Button, adjust the Button as well
                 var parentButton = _selectedShape.Parent as Button;
                 FrameworkElement targetElement = parentButton as FrameworkElement ?? _selectedShape;
 
-                // Keep the center consistent while resizing
+                // Keep center position consistent while resizing
                 double centerX = Canvas.GetLeft(targetElement) + (targetElement.Width / 2);
 
-                _selectedShape.Width = newWidth;
+                targetElement.Width = shapeWidth;
                 if (parentButton != null)
-                    parentButton.Width = newWidth;
+                    parentButton.Width = shapeWidth;
 
-                Canvas.SetLeft(targetElement, centerX - (newWidth / 2));
+                Canvas.SetLeft(targetElement, centerX - (shapeWidth / 2));
 
-                // Keep rotation pivot centered after resize
                 UpdateRotationPivot();
             }
-            else
-            {
-                shapeWidth = e.NewValue;
-                UpdatePreview();
-            }
+
+            UpdatePreview();
         }
 
         private void HeightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            shapeHeight = e.NewValue; // Always keep shapeHeight in sync
+
             if (_selectedShape != null)
             {
-                double newHeight = e.NewValue;
-
-                // If the shape is inside a Button, adjust the Button as well
                 var parentButton = _selectedShape.Parent as Button;
                 FrameworkElement targetElement = parentButton as FrameworkElement ?? _selectedShape;
 
-                // Keep the center consistent while resizing
+                // Keep center position consistent while resizing
                 double centerY = Canvas.GetTop(targetElement) + (targetElement.Height / 2);
 
-                _selectedShape.Height = newHeight;
+                targetElement.Height = shapeHeight;
                 if (parentButton != null)
-                    parentButton.Height = newHeight;
+                    parentButton.Height = shapeHeight;
 
-                Canvas.SetTop(targetElement, centerY - (newHeight / 2));
+                Canvas.SetTop(targetElement, centerY - (shapeHeight / 2));
 
-                // Keep rotation pivot centered after resize
                 UpdateRotationPivot();
             }
-            else
-            {
-                shapeHeight = e.NewValue;
-                UpdatePreview();
-            }
+
+            UpdatePreview();
         }
 
         private void RotationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            rotationAngle = e.NewValue; // Always keep rotationAngle in sync
+
             if (_selectedShape != null)
             {
-                double angle = e.NewValue;
-
                 var parentButton = _selectedShape.Parent as Button;
                 FrameworkElement targetElement = parentButton as FrameworkElement ?? _selectedShape;
 
-                // Always pivot around center of the current width/height
-                var rotateTransform = new RotateTransform(angle, _selectedShape.Width / 2, _selectedShape.Height / 2);
+                // Always pivot rotation around center
+                var rotateTransform = new RotateTransform(rotationAngle, targetElement.Width / 2, targetElement.Height / 2);
                 targetElement.RenderTransform = rotateTransform;
 
                 targetElement.InvalidateVisual();
                 targetElement.UpdateLayout();
             }
-            else
-            {
-                rotationAngle = e.NewValue;
-                UpdatePreview();
-            }
+
+            UpdatePreview();
         }
+
+
 
 
 
@@ -278,26 +311,30 @@ namespace Winton.Views
                     {
                         // Editing an existing section
                         string sectionId = _selectedShape.Tag as string;
-                        double x = Canvas.GetLeft(_selectedShape);
-                        double y = Canvas.GetTop(_selectedShape);
-                        double newWidth = _selectedShape.Width;
-                        double newHeight = _selectedShape.Height;
 
-                        // Handle rotation (works even if it's just a RotateTransform)
+                        var parentButton = _selectedShape.Parent as Button;
+                        FrameworkElement targetElement = parentButton as FrameworkElement ?? _selectedShape;
+
+                        // Get position, size, and rotation from the live element
+                        double x = Canvas.GetLeft(targetElement);
+                        double y = Canvas.GetTop(targetElement);
+                        double newWidth = targetElement.Width;
+                        double newHeight = targetElement.Height;
+
                         double rotation = 0;
-                        if (_selectedShape.RenderTransform is RotateTransform rotate)
+                        if (targetElement.RenderTransform is RotateTransform rotate)
                         {
                             rotation = rotate.Angle;
                         }
-                        else if (_selectedShape.RenderTransform is TransformGroup tg)
+                        else if (targetElement.RenderTransform is TransformGroup tg)
                         {
                             var rotateTransform = tg.Children.OfType<RotateTransform>().FirstOrDefault();
                             if (rotateTransform != null)
                                 rotation = rotateTransform.Angle;
                         }
 
-                        // Preserve the current name (only change if user picked a new type)
-                        string currentName = _selectedShape?.Tag?.ToString();
+                        // Preserve or update the section name
+                        string currentName = sectionId ?? "Section";
                         string newName = !string.IsNullOrEmpty(SelectedShape) ? SelectedShape : currentName;
 
                         if (!string.IsNullOrEmpty(newName) && newName != currentName)
@@ -305,7 +342,7 @@ namespace Winton.Views
                             await CanvasService.UpdateSectionNameAsync(sectionId, newName);
                         }
 
-                        // Always update size, position, and rotation
+                        // Always update dimensions and rotation in the DB
                         await CanvasService.UpdateSectionDimensionsAsync(sectionId, x, y, newWidth, newHeight, rotation);
 
                         MessageBox.Show("Section updated successfully!");
@@ -347,6 +384,7 @@ namespace Winton.Views
                 Console.WriteLine($"ERROR in ApplyShape_Click: {ex.Message}");
             }
         }
+
 
 
 
