@@ -121,8 +121,6 @@ namespace Winton.Views
         private void AddSquare_Click(object sender, RoutedEventArgs e) => SelectShape("Square");
         private void AddCircle_Click(object sender, RoutedEventArgs e) => SelectShape("Circle");
         private void AddTriangle_Click(object sender, RoutedEventArgs e) => SelectShape("Triangle");
-        private void AddCross_Click(object sender, RoutedEventArgs e) => SelectShape("Cross");
-        private void DrawCustomSection_Click(object sender, RoutedEventArgs e) => SelectShape("Custom");
 
         private void SelectShape(string shapeType)
         {
@@ -158,9 +156,6 @@ namespace Winton.Views
                 case "Triangle":
                     previewShape = CreateTriangle();
                     break;
-                case "Cross":
-                    previewShape = CreateCross();
-                    break;
             }
             UpdatePreview();
             PreviewCanvas.Children.Add(previewShape);
@@ -180,14 +175,6 @@ namespace Winton.Views
                 StrokeThickness = 1,
                 Fill = Brushes.Transparent
             };
-        }
-
-        private Path CreateCross()
-        {
-            GeometryGroup crossGeometry = new GeometryGroup();
-            crossGeometry.Children.Add(new LineGeometry(new Point(0, shapeHeight / 2), new Point(shapeWidth, shapeHeight / 2)));
-            crossGeometry.Children.Add(new LineGeometry(new Point(shapeWidth / 2, 0), new Point(shapeWidth / 2, shapeHeight)));
-            return new Path { Data = crossGeometry, Stroke = Brushes.White, StrokeThickness = 1 };
         }
 
 
@@ -345,7 +332,6 @@ namespace Winton.Views
                         // Always update dimensions and rotation in the DB
                         await CanvasService.UpdateSectionDimensionsAsync(sectionId, x, y, newWidth, newHeight, rotation);
 
-                        MessageBox.Show("Section updated successfully!");
                     }
                     else
                     {
@@ -384,6 +370,7 @@ namespace Winton.Views
                 Console.WriteLine($"ERROR in ApplyShape_Click: {ex.Message}");
             }
         }
+
 
 
 

@@ -63,10 +63,8 @@
 				<TextBlock Text="Add Sections" Foreground="White" FontSize="16" FontWeight="Bold" Margin="0,5"/>
 				<Button Content="Square" Click="AddSquare_Click" Margin="5"/>
 				<Button Content="Circle" Click="AddCircle_Click" Margin="5"/>
-				<Button Content="Triangle" Click="AddTriangle_Click" Margin="5"/>
-				<Button Content="Cross" Click="AddCross_Click" Margin="5"/>
-				<Button Content="Draw Custom" Click="DrawCustomSection_Click" Margin="5"/>
-			</StackPanel>
+                <Button Content="Triangle" Click="AddTriangle_Click" Margin="5"/>
+            </StackPanel>
 		</Border>
 	</Grid>
 </UserControl>

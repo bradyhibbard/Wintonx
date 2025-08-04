@@ -6,19 +6,17 @@
         ResizeMode="NoResize"
         Background="#333">
 	<Grid>
-		<StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10">
-			<TextBlock Text="INSERT" HorizontalAlignment="Center" FontSize="16" Foreground="White" FontWeight="Bold" Margin="0,5"/>
+		<StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Height="535">
+			<TextBlock Text="Insert Section" HorizontalAlignment="Center" FontSize="16" Foreground="White" FontWeight="Bold" Margin="0,10,0,30"/>
 
 			<!-- Shape Selection -->
 			<Button Content="Square" Background="Transparent" Foreground="White" Click="AddSquare_Click" Margin="5" Width="200"/>
 			<Button Content="Circle" Background="Transparent" Foreground="White" Click="AddCircle_Click" Margin="5" Width="200"/>
-			<Button Content="Triangle" Background="Transparent" Foreground="White" Click="AddTriangle_Click" Margin="5" Width="200"/>
-			<Button Content="Cross" Background="Transparent" Foreground="White" Click="AddCross_Click" Margin="5" Width="200"/>
-			<Button Content="Draw Custom" Background="Transparent" Foreground="White" Click="DrawCustomSection_Click" Margin="5" Width="200"/>
+            <Button Content="Triangle" Background="Transparent" Foreground="White" Click="AddTriangle_Click" Margin="5" Width="200"/>
 
 
-			<!-- Size Controls -->
-			<TextBlock Text="Width" HorizontalAlignment="Center" FontSize="12" Foreground="White" FontWeight="Bold" Margin="0,5,0,2"/>
+            <!-- Size Controls -->
+			<TextBlock Text="Width" HorizontalAlignment="Center" FontSize="12" Foreground="White" FontWeight="Bold" Margin="0,25,0,2"/>
 			<Slider x:Name="WidthSlider" Minimum="10" Maximum="200" ValueChanged="WidthSlider_ValueChanged" Width="200"/>
 
 			<TextBlock Text="Height" HorizontalAlignment="Center" FontSize="12" Foreground="White" FontWeight="Bold" Margin="0,5,0,2"/>
@@ -38,7 +36,7 @@
 			</Border>
 
 			<!-- Action Buttons -->
-			<Button Content="Apply" Click="ApplyShape_Click" Margin="0,5,0,2" Width="200" Background="White" Foreground="Black"/>
+			<Button Content="Apply" Click="ApplyShape_Click" Margin="0,25,0,2" Width="200" Background="White" Foreground="Black"/>
 			<Button Content="Close" Click="CloseWindow_Click" Margin="10,5,10,5" Width="200" Background="White" Foreground="Red"/>
 		</StackPanel>
 	</Grid>

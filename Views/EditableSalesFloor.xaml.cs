@@ -339,8 +339,6 @@ namespace Winton.Views
                 _deletedPartitionIds.Clear();
 
                 _hasUnsavedChanges = false;
-
-                MessageBox.Show("Changes saved successfully!", "Debug Info");
             }
             catch (Exception ex)
             {
@@ -423,42 +421,15 @@ namespace Winton.Views
             MessageBox.Show("Adding a Triangle section...");
         }
 
-        private void AddCross_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Adding a Cross section...");
-        }
-
-        private void DrawCustomSection_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Entering Custom Drawing Mode...");
-        }
-
         // EditableSalesFloor.xaml.cs
         private async void AddSection_Click(object sender, RoutedEventArgs e)
         {
-            // 1) Create the shape on the canvas:
-            await AddShapeToCanvasAsync(
-                name: "Square",
-                x: 100, y: 100,
-                width: 50, height: 50,
-                rotation: 0,
-                existingSectionId: null,
-                wrapAsButton: false);
-
-            // 2) Find it by Tag (new GUID) or by last child:
-            var shape = SalesFloorCanvas.Children
-                .OfType<Shape>()
-                .LastOrDefault(s => s.Tag is string id /* and match your new ID logic */);
-
-            if (shape == null) return;
-
-            // 3) Hand it off to the editor as the “selected” shape:
-            var editWindow = new AddSectionsWindow(shape)
+            var addWindow = new AddSectionsWindow
             {
                 Owner = Window.GetWindow(this),
                 Topmost = true
             };
-            editWindow.Show();
+            addWindow.Show();
             Application.Current.MainWindow?.Focus();
         }
 

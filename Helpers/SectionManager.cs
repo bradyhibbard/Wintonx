@@ -324,20 +324,73 @@ namespace Winton.Helpers
                         editableSalesFloor._isMoveSave = true;
                     }
 
-                    _canvas.Children.Remove(_selectedElement);
+                    UpdateShapeVisual(_selectedElement, x, y, width, height, rotation);
+
 
                     // Save the new position in the database
                     await CanvasService.UpdateSectionDimensionsAsync(sectionId, x, y, width, height, rotation);
 
                     // Re-add the element at the new position
                     // Optionally, use a method to re-render the section based on the database data
-                    await ReRenderSection(sectionId);
+                    //await ReRenderSection(sectionId);
                 }
 
+                ClearSelection();
                 _selectedElement = null;
+
+
 
             }
         }
+
+        private void UpdateShapeVisual(FrameworkElement element, double x, double y, double width, double height, double rotation)
+        {
+            if (element is Button button && button.Content is Shape shape)
+            {
+                // Update Button size and position
+                button.Width = width;
+                button.Height = height;
+                Canvas.SetLeft(button, x);
+                Canvas.SetTop(button, y);
+
+                // Update shape size and rotation
+                shape.Width = width;
+                shape.Height = height;
+                shape.RenderTransform = new TransformGroup
+                {
+                    Children = new TransformCollection
+            {
+                new ScaleTransform(1, 1),
+                new RotateTransform(rotation, width / 2, height / 2)
+            }
+                };
+            }
+            else if (element is Shape plainShape)
+
+            {
+                // Update shape size and position
+                plainShape.Width = width;
+                plainShape.Height = height;
+                Canvas.SetLeft(plainShape, x);
+                Canvas.SetTop(plainShape, y);
+
+                plainShape.RenderTransform = new TransformGroup
+                {
+                    Children = new TransformCollection
+            {
+                new ScaleTransform(1, 1),
+                new RotateTransform(rotation, width / 2, height / 2)
+            }
+                };
+            }
+
+            // Force a redraw
+            element.InvalidateVisual();
+            element.UpdateLayout();
+
+
+        }
+
 
         private async Task ReRenderSection(string sectionId)
         {
