@@ -1042,11 +1042,22 @@ namespace Winton.Views
 
                 SalesFloorCanvas.Cursor = Cursors.Cross;
                 MessageBox.Show("Floor Design mode activated. Click on the canvas to draw partition walls. Hold Shift for multi-point segments.");
+
+
+                // Update button visuals
+                FloorDesignButton.Content = "Disable Vignette Design";
+                FloorDesignButton.Background = Brushes.Red;
+                FloorDesignButton.Foreground = Brushes.White;
             }
             else
             {
                 SalesFloorCanvas.Cursor = Cursors.Arrow;
                 MessageBox.Show("Floor Design mode deactivated.");
+
+                // Revert button visuals
+                FloorDesignButton.Content = "Enable Vignette Design";
+                FloorDesignButton.Background = Brushes.Transparent;
+                FloorDesignButton.Foreground = Brushes.White;
             }
         }
 

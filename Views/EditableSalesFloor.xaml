@@ -33,19 +33,16 @@
 				<Button x:Name="PerimeterButton" Content="Perimeter Design" Padding="10,5" Margin="5"
                         Background="Transparent" Foreground="White" BorderThickness="0"
                         Click="PerimeterButton_Click"/>
-				<Button x:Name="FloorDesignButton" Content="Floor Design" Padding="10,5" Margin="5"
+				<Button x:Name="FloorDesignButton" Content="Enable Vignette Design" Padding="10,5" Margin="5"
                         Background="Transparent" Foreground="White" BorderThickness="0"
                         Click="FloorDesign_Click"/>
 				<Button Content="Add Sections" Padding="10,5" Margin="5"
                         Background="Transparent" Foreground="White" BorderThickness="0"
                         Click="AddSection_Click"/>
-				<Button Content="Save" Padding="10,5" Margin="5"
+                <Button Content="Save" Padding="10,5" Margin="5"
 						Background="Transparent" Foreground="White" BorderThickness="0" 
 						Click="SaveChanges_Click"/>
-				<Button Content="Save and Exit" Padding="10,5" Margin="5"
-                        Background="Transparent" Foreground="Red" BorderThickness="0"
-                        Click="ExitEditMode_Click"/>
-			</StackPanel>
+            </StackPanel>
 		</Grid>
 
 		<!-- Canvas for Designing Sales Floor, Wrapped in a ViewBox for Uniform Scaling -->
