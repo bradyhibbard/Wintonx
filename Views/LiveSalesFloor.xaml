@@ -3,106 +3,100 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:views="clr-namespace:Winton.Views"
              xmlns:local="clr-namespace:Winton.Views"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-	<Grid>
-		<!-- Define two rows: menu bar at the top and main content below -->
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="*"/>
-		</Grid.RowDefinitions>
 
-		<!-- Menu Bar at the Top -->
-		<DockPanel Grid.Row="0" Background="#2D2D30" Height="50">
-			<StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="5">
-				<Button Content="Add Products" Click="AddProducts_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
-				<Button Content="Filters" Click="Filters_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
-			</StackPanel>
-		</DockPanel>
+    <Grid>
+        <!-- Define two rows: menu bar at the top and main content below -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-		<!-- Main Content Area -->
-		<Grid Grid.Row="1">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition x:Name="FilterPanelColumn" Width="0"/>
-				<ColumnDefinition x:Name="ProductPanelColumn" Width="0"/>
-				<ColumnDefinition Width="*"/>
-			</Grid.ColumnDefinitions>
+        <!-- Menu Bar at the Top -->
+        <DockPanel Grid.Row="0" Background="#2D2D30" Height="50">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="5">
+                <Button Content="Add Products" Click="AddProducts_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
+                <Button Content="Filters" Click="Filters_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
+                <Button Content="Test Highlight Section"
+                        Click="TestHighlightButton_Click"
+                        Margin="10"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top" />
 
-			<!-- Filter Panel -->
-			<Border x:Name="FilterPanel" Grid.Column="0" Background="#F0F0F0" BorderBrush="#CCCCCC" BorderThickness="1" Visibility="Collapsed">
-				<StackPanel Margin="10">
-					<TextBlock Text="Filter Panel" FontWeight="Bold" FontSize="14"/>
-					<TextBlock Text="Vendor" FontSize="12"/>
-					<TextBox x:Name="VendorTextBox" Width="200" Margin="0,5,0,10" TextChanged="VendorTextBox_TextChanged"/>
+            </StackPanel>
+        </DockPanel>
 
-					<TextBlock Text="Category" FontSize="12"/>
-					<TextBox x:Name="CategoryTextBox" Width="200" Margin="0,5,0,10" TextChanged="CategoryTextBox_TextChanged"/>
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="FilterPanelColumn" Width="0"/>
+                <ColumnDefinition x:Name="ProductPanelColumn" Width="0"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-					<TextBlock Text="Group" FontSize="12"/>
-					<TextBox x:Name="GroupTextBox" Width="200" Margin="0,5,0,10" TextChanged="GroupTextBox_TextChanged"/>
+            <!-- New Filter Panel (UserControl) -->
+            <Border x:Name="FilterPanel" Grid.Column="0" Background="#F0F0F0" BorderBrush="#CCCCCC" BorderThickness="1" Visibility="Collapsed">
+                <views:FilterPanel x:Name="FilterPanelControl" />
+            </Border>
 
-					<TextBlock Text="Product" FontSize="12"/>
-					<TextBox x:Name="ProductTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductTextBox_TextChanged"/>
-				</StackPanel>
-			</Border>
+            <!-- Left Panel for Add Products -->
+            <Border x:Name="ProductPanel" Grid.Column="1" Background="White" BorderBrush="Black" BorderThickness="1" Visibility="Collapsed">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                    </Grid.ColumnDefinitions>
 
-			<!-- Left Panel for Add Products -->
-			<Border x:Name="ProductPanel" Grid.Column="1" Background="White" BorderBrush="Black" BorderThickness="1" Visibility="Collapsed">
-				<Grid Margin="10">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="1*"/>
-						<ColumnDefinition Width="1*"/>
-					</Grid.ColumnDefinitions>
+                    <!-- Left Section: Search Inputs -->
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Text="Section ID" FontSize="12" Margin="10"/>
+                        <TextBox x:Name="SectionIdTextBox" Width="200" Margin="0,5,0,10" TextChanged="SectionIdTextBox_TextChanged"/>
 
-					<!-- Left Section: Search Inputs -->
-					<StackPanel Grid.Column="0" Margin="0,0,10,0">
-						<TextBlock Text="Section ID" FontSize="12" Margin="10"/>
-						<TextBox x:Name="SectionIdTextBox" Width="200" Margin="0,5,0,10" TextChanged="SectionIdTextBox_TextChanged"/>
+                        <TextBlock Text="Search Products" FontSize="14" FontWeight="Bold" Margin="10"/>
 
-						<TextBlock Text="Search Products" FontSize="14" FontWeight="Bold" Margin="10"/>
+                        <TextBlock Text="Vendor" FontSize="12"/>
+                        <TextBox x:Name="ProductVendorTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductVendorTextBox_TextChanged"/>
 
-						<TextBlock Text="Vendor" FontSize="12"/>
-						<TextBox x:Name="ProductVendorTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductVendorTextBox_TextChanged"/>
+                        <TextBlock Text="Category" FontSize="12"/>
+                        <TextBox x:Name="ProductCategoryTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductCategoryTextBox_TextChanged"/>
 
-						<TextBlock Text="Category" FontSize="12"/>
-						<TextBox x:Name="ProductCategoryTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductCategoryTextBox_TextChanged"/>
+                        <TextBlock Text="Group" FontSize="12"/>
+                        <TextBox x:Name="ProductGroupTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductGroupTextBox_TextChanged"/>
 
-						<TextBlock Text="Group" FontSize="12"/>
-						<TextBox x:Name="ProductGroupTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductGroupTextBox_TextChanged"/>
+                        <TextBlock Text="Product" FontSize="12"/>
+                        <TextBox x:Name="AddProductTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductProductTextBox_TextChanged"/>
 
-						<TextBlock Text="Product" FontSize="12"/>
-						<TextBox x:Name="AddProductTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductProductTextBox_TextChanged"/>
+                        <Button Content="View Section Archive" Click="ViewSectionArchive_Click" Margin="10"/>
+                    </StackPanel>
 
-						<Button Content="View Section Archive" Click="ViewSectionArchive_Click" Margin="10"/>
-					</StackPanel>
+                    <!-- Right Section: Search Results and Added Products (Scroll Enabled) -->
+                    <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <CheckBox x:Name="SelectAllCheckBox" Content="Select All" Margin="10" Checked="SelectAllCheckBox_Checked" Unchecked="SelectAllCheckBox_Unchecked"/>
 
-					<!-- Right Section: Search Results and Added Products (Scroll Enabled) -->
-					<ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-						<StackPanel>
-							<CheckBox x:Name="SelectAllCheckBox" Content="Select All" Margin="10" Checked="SelectAllCheckBox_Checked" Unchecked="SelectAllCheckBox_Unchecked"/>
+                            <ListBox x:Name="FilteredProductsListBox" Height="250" SelectionMode="Multiple" Margin="0,0,0,10"/>
 
-							<ListBox x:Name="FilteredProductsListBox" Height="250" SelectionMode="Multiple" Margin="0,0,0,10"/>
+                            <Button Content="Add Products" Click="AddProductButton_Click" Margin="10"/>
 
-							<Button Content="Add Products" Click="AddProductButton_Click" Margin="10"/>
+                            <TextBlock Text="Added Products" FontSize="14" FontWeight="Bold" Margin="10"/>
+                            <ListBox x:Name="AddedProductsListBox" Height="250" SelectionMode="Single" SelectionChanged="AddedProductsListBox_SelectionChanged"/>
 
-							<TextBlock Text="Added Products" FontSize="14" FontWeight="Bold" Margin="10"/>
-							<ListBox x:Name="AddedProductsListBox" Height="250" SelectionMode="Single" SelectionChanged="AddedProductsListBox_SelectionChanged"/>
+                            <TextBlock Text="Date Added" FontSize="12" Margin="10"/>
+                            <DatePicker x:Name="DateAddedPicker" Margin="10" SelectedDateChanged="DateAddedPicker_SelectedDateChanged"/>
 
-							<TextBlock Text="Date Added" FontSize="12" Margin="10"/>
-							<DatePicker x:Name="DateAddedPicker" Margin="10" SelectedDateChanged="DateAddedPicker_SelectedDateChanged"/>
+                            <Button Content="Remove Selected" Click="RemoveProductButton_Click" Margin="10"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
 
-							<Button Content="Remove Selected" Click="RemoveProductButton_Click" Margin="10"/>
-						</StackPanel>
-					</ScrollViewer>
-				</Grid>
-			</Border>
-
-
-			<!-- Canvas wrapped in a ViewBox for responsiveness -->
-			<Viewbox Grid.Column="2" Stretch="Uniform">
-				<Canvas x:Name="LiveFloorCanvas" Background="LightGray" Width="1200" Height="500"/>
-			</Viewbox>
-		</Grid>
-	</Grid>
+            <!-- Canvas wrapped in a ViewBox for responsiveness -->
+            <Viewbox Grid.Column="2" Stretch="Uniform">
+                <Canvas x:Name="LiveFloorCanvas" Background="LightGray" Width="1200" Height="500"/>
+            </Viewbox>
+        </Grid>
+    </Grid>
 </UserControl>

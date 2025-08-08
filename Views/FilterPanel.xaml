@@ -1,28 +1,107 @@
 ﻿<UserControl x:Class="Winton.Views.FilterPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Height="Auto" Width="250">
-	<Border Background="white" Padding="10">
-		<StackPanel>
-			<TextBlock Text="Filter Options" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+             MinHeight="300" MinWidth="450">
 
-			<TextBlock Text="Vendor:" Foreground="Black"/>
-			<ComboBox x:Name="VendorComboBox" Margin="0,5,0,10" SelectionChanged="VendorComboBox_SelectionChanged"/>
+    <Border Background="White" Padding="10" CornerRadius="6">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-			<TextBlock Text="Category:" Foreground="Black"/>
-			<ComboBox x:Name="CategoryComboBox" Margin="0,5,0,10" SelectionChanged="CategoryComboBox_SelectionChanged"/>
+            <!-- LEFT COLUMN: FILTER INPUTS -->
+            <StackPanel Grid.Column="0" Margin="10" VerticalAlignment="Top">
+                <TextBlock Text="Filter Options"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Margin="0,0,0,10"/>
 
-			<TextBlock Text="Group:" Foreground="Black"/>
-			<ComboBox x:Name="GroupComboBox" Margin="0,5,0,10" SelectionChanged="GroupComboBox_SelectionChanged"/>
+                <TextBlock Text="Vendor:"/>
+                <ComboBox x:Name="VendorComboBox"
+                          IsEditable="True"
+                          IsTextSearchEnabled="True"
+                          StaysOpenOnEdit="True"
+                          IsReadOnly="True"
+                          SelectionChanged="VendorComboBox_SelectionChanged"
+                          Margin="0,0,0,10"/>
 
-			<TextBlock Text="Start Date:" Foreground="Black"/>
-			<DatePicker x:Name="StartDatePicker" Margin="0,5,0,10"/>
+                <TextBlock Text="Category:"/>
+                <ComboBox x:Name="CategoryComboBox"
+                          IsEditable="True"
+                          IsTextSearchEnabled="True"
+                          StaysOpenOnEdit="True"
+                          IsReadOnly="True"
+                          SelectionChanged="CategoryComboBox_SelectionChanged"
+                          Margin="0,0,0,10"/>
 
-			<TextBlock Text="End Date:" Foreground="Black"/>
-			<DatePicker x:Name="EndDatePicker" Margin="0,5,0,10"/>
+                <TextBlock Text="Group:"/>
+                <ComboBox x:Name="GroupComboBox"
+                          IsEditable="True"
+                          IsTextSearchEnabled="True"
+                          StaysOpenOnEdit="True"
+                          IsReadOnly="True"
+                          SelectionChanged="GroupComboBox_SelectionChanged"
+                          Margin="0,0,0,10"/>
 
-			<Button x:Name="ApplyFilterButton" Content="Apply Filters" Margin="0,10,0,0"/>
-			<Button x:Name="ResetFilterButton" Content="Reset Filters" Margin="0,5,0,0"/>
-		</StackPanel>
-	</Border>
+                <TextBlock Text="Product" FontSize="12"/>
+                <StackPanel>
+                    <TextBox x:Name="ProductSearchBox"
+                         Width="200"
+                         Margin="0,0,0,5"
+                         TextChanged="ProductSearchBox_TextChanged"/>
+
+                    <ListBox x:Name="ProductSuggestionsListBox"
+                         Width="200"
+                         Height="100"
+                         Visibility="Collapsed"
+                         MouseDoubleClick="ProductSuggestionsListBox_MouseDoubleClick"/>
+                </StackPanel>
+
+
+                <TextBlock Text="Start Date:"/>
+                <DatePicker x:Name="StartDatePicker" SelectedDateChanged="StartDatePicker_SelectedDateChanged" Margin="0,0,0,10"/>
+
+                <TextBlock Text="End Date:"/>
+                <DatePicker x:Name="EndDatePicker" SelectedDateChanged="EndDatePicker_SelectedDateChanged" Margin="0,0,0,10"/>
+
+                <Button Content="Clear All Filters"
+                        Click="ClearAllFilters_Click"
+                        Margin="0,20,0,0"
+                        Width="150"/>
+            </StackPanel>
+
+            <!-- RIGHT COLUMN: ACTIVE FILTERS -->
+            <ScrollViewer Grid.Column="1" Margin="10" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Active Filters"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Margin="0,0,0,0"/>
+
+                    <WrapPanel x:Name="ActiveFiltersPanel"
+                               Orientation="Horizontal"
+                               VerticalAlignment="Top"
+                               HorizontalAlignment="Left"
+                               Margin="0,0,0,10" />
+                    
+                    <TextBlock Text="Filter Match Mode:" FontWeight="SemiBold" Margin="0,5,0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <RadioButton x:Name="MatchAnyRadioButton"
+                                Content="Match Any"
+                                GroupName="MatchMode"
+                                IsChecked="True"
+                                Checked="MatchModeRadio_Checked"
+                                Margin="0,0,10,0"/>
+                        <RadioButton x:Name="MatchAllRadioButton"
+                                Content="Match All"
+                                GroupName="MatchMode"
+                                Checked="MatchModeRadio_Checked"/>
+                    </StackPanel>
+
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
 </UserControl>

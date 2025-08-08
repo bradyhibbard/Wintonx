@@ -19,7 +19,9 @@ namespace Winton.Views
         private string _currentSectionId = null;
         private bool _isFilterPanelOpen = false;
         private bool _isProductPanelOpen = false;
-        private double _filterPanelWidth => ActualWidth * 0.2;
+        private Dictionary<string, Button> _sectionButtons = new();
+
+        private double _filterPanelWidth => ActualWidth * 0.4;
         private double _productPanelWidth => ActualWidth * 0.4;
         private SectionManager _sectionManager;
         private Polyline _perimeterLine = new Polyline { Stroke = Brushes.Black, StrokeThickness = 2 };
@@ -29,6 +31,8 @@ namespace Winton.Views
             InitializeComponent();
             _sectionManager = new SectionManager(LiveFloorCanvas, this);
             Loaded += LiveSalesFloor_Loaded;
+
+            FilterPanelControl.FiltersChanged += FilterPanel_FiltersChanged;
 
             // Subscribe to the SectionSelected event.
             _sectionManager.SectionSelected += async (sectionId) =>
@@ -43,6 +47,19 @@ namespace Winton.Views
             await LoadSectionsAsync();
             await LoadPerimeterAsync();
             await LoadPartitionsAsync();
+
+            // Extract filter values from product list
+            var vendors = _allProducts.Select(p => p.Vendor).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct().OrderBy(v => v).ToList();
+            var categories = _allProducts.Select(p => p.Cat).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().OrderBy(c => c).ToList();
+            var groups = _allProducts.Select(p => p.Grp).Where(g => !string.IsNullOrWhiteSpace(g)).Distinct().OrderBy(g => g).ToList();
+            var products = _allProducts.Select(p => p.ItemNumber).Where(pn => !string.IsNullOrWhiteSpace(pn)).Distinct().OrderBy(pn => pn).ToList();
+
+            // Load into FilterPanel
+            FilterPanelControl.LoadVendors(vendors);
+            FilterPanelControl.LoadCategories(categories);
+            FilterPanelControl.LoadGroups(groups);
+            FilterPanelControl.LoadProducts(products);
+
         }
 
         private async Task LoadSectionsAsync()
@@ -76,6 +93,67 @@ namespace Winton.Views
                 }
             }
         }
+
+        private void HighlightSection(string sectionId)
+        {
+            var element = LiveFloorCanvas.Children
+                .OfType<FrameworkElement>()
+                .FirstOrDefault(e => e.Tag?.ToString() == sectionId);
+
+            if (element == null)
+            {
+                element.Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Colors.Yellow,
+                    BlurRadius = 20,
+                    ShadowDepth = 0
+                };
+            }
+        }
+
+        private void ClearAllHighlights()
+        {
+            foreach (var element in LiveFloorCanvas.Children.OfType<FrameworkElement>())
+            {
+                element.Effect = null;
+            }
+        }
+
+
+
+        private async void FilterPanel_FiltersChanged(object sender, FilterChangedEventArgs e)
+        {
+            // 1. Clear existing highlights
+            ClearAllHighlights();
+
+            // 2. Prepare dictionary of filters to pass to service
+            var filters = e.ActiveFilters;
+
+            // 3. Add date filters if available
+            if (e.StartDate.HasValue)
+                filters["Start Date"] = new HashSet<string> { e.StartDate.Value.ToShortDateString() };
+
+            if (e.EndDate.HasValue)
+                filters["End Date"] = new HashSet<string> { e.EndDate.Value.ToShortDateString() };
+
+            // 4. Call service to get matching sections
+            var matchingSections = await ProductPlacementServices.GetMatchingSectionsAsync(filters, e.MatchMode.ToString());
+
+            // 5. Highlight each matching section
+            foreach (var sectionId in matchingSections)
+            {
+                HighlightSection(sectionId);
+            }
+        }
+
+        private void TestHighlightButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Replace "BED1" with an actual sectionId from your app
+            HighlightSection("25ceb11f-9823-481c-932d-d608b9884e0c");
+        }
+
+
+
 
 
         private void Section_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -208,29 +286,7 @@ namespace Winton.Views
             ToggleFilterPanel(!_isFilterPanelOpen);
         }
 
-        // FILTER PANEL METHODS
-        private void VendorTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
-        private void CategoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
-        private void GroupTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
-        private void ProductTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
 
-        private void FilterProducts()
-        {
-            var vendorInput = VendorTextBox.Text.ToLower();
-            var categoryInput = CategoryTextBox.Text.ToLower();
-            var groupInput = GroupTextBox.Text.ToLower();
-            var productInput = ProductTextBox.Text.ToLower();
-
-            var filteredProducts = _allProducts
-                .Where(p => (string.IsNullOrEmpty(vendorInput) || p.Vendor.ToLower().Contains(vendorInput)) &&
-                            (string.IsNullOrEmpty(categoryInput) || p.Cat.ToLower().Contains(categoryInput)) &&
-                            (string.IsNullOrEmpty(groupInput) || p.Grp.ToLower().Contains(groupInput)) &&
-                            (string.IsNullOrEmpty(productInput) || p.ItemNumber.ToLower().Contains(productInput)))
-                .OrderBy(p => p.ItemNumber)
-                .ToList();
-
-            UpdateFilteredProductsList(filteredProducts);
-        }
         private void UpdateFilteredProductsList(List<Product> products)
         {
             FilteredProductsListBox.Items.Clear();
@@ -462,6 +518,10 @@ namespace Winton.Views
             var archiveWindow = new SectionArchiveWindow(_currentSectionId);
             archiveWindow.Show();
         }
+
+
+        //FILTERING METHODS
+
 
 
     }

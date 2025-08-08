@@ -639,7 +639,139 @@ namespace Winton.Services
         }
 
 
+        public static async Task<List<string>> GetSectionIdsByFiltersAsync(
+    List<string> itemNumbers,
+    DateTime? startDate,
+    DateTime? endDate)
+        {
+            var sectionIds = new List<string>();
 
+            using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+            await connection.OpenAsync();
+
+            var conditions = new List<string>();
+            var parameters = new List<SqliteParameter>();
+
+            if (itemNumbers?.Any() == true)
+            {
+                conditions.Add($"ItemNumber IN ({string.Join(",", itemNumbers.Select((_, i) => $"@item{i}"))})");
+                for (int i = 0; i < itemNumbers.Count; i++)
+                {
+                    parameters.Add(new SqliteParameter($"@item{i}", itemNumbers[i]));
+                }
+            }
+
+            if (startDate.HasValue)
+            {
+                conditions.Add("DatePlaced >= @StartDate");
+                parameters.Add(new SqliteParameter("@StartDate", startDate.Value.ToString("yyyy-MM-dd")));
+            }
+
+            if (endDate.HasValue)
+            {
+                conditions.Add("DatePlaced <= @EndDate");
+                parameters.Add(new SqliteParameter("@EndDate", endDate.Value.ToString("yyyy-MM-dd")));
+            }
+
+            var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
+
+            var commandText = $@"
+        SELECT DISTINCT SectionID 
+        FROM ProductPlacement 
+        {whereClause}";
+
+            using var command = new SqliteCommand(commandText, connection);
+            command.Parameters.AddRange(parameters.ToArray());
+
+            using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                sectionIds.Add(reader["SectionID"].ToString());
+            }
+
+            return sectionIds;
+        }
+
+        public static async Task<List<string>> GetMatchingSectionsAsync(Dictionary<string, HashSet<string>> filters, string matchMode)
+        {
+            List<string> matchingSectionIds = new();
+
+            using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+            await connection.OpenAsync();
+
+            var sql = @"
+        SELECT DISTINCT pp.SectionId
+        FROM ProductPlacements pp
+        JOIN Products p ON pp.ProductId = p.ProductId
+        LEFT JOIN SalesData sd ON sd.PlacementId = pp.PlacementId
+        WHERE {conditions};
+    ";
+
+            var conditions = new List<string>();
+            var parameters = new List<SqliteParameter>();
+
+            // Helper to create OR/AND grouped conditions
+            void AddFilterCondition(string column, HashSet<string> values, string tableAlias)
+            {
+                if (values.Count == 0) return;
+
+                var conditionList = new List<string>();
+                int i = 0;
+                foreach (var val in values)
+                {
+                    string paramName = $"@{tableAlias}_{column}_{i}";
+                    conditionList.Add($"{tableAlias}.{column} = {paramName}");
+                    parameters.Add(new SqliteParameter(paramName, val));
+                    i++;
+                }
+
+                string combined = matchMode == "MatchAll"
+                    ? string.Join(" AND ", conditionList)
+                    : $"({string.Join(" OR ", conditionList)})";
+
+                conditions.Add(combined);
+            }
+
+            if (filters.TryGetValue("Vendor", out var vendors))
+                AddFilterCondition("Vendor", vendors, "p");
+
+            if (filters.TryGetValue("Category", out var categories))
+                AddFilterCondition("Category", categories, "p");
+
+            if (filters.TryGetValue("Group", out var groups))
+                AddFilterCondition("GroupName", groups, "p");
+
+            if (filters.TryGetValue("Product", out var products))
+                AddFilterCondition("ItemNumber", products, "p");
+
+            if (filters.TryGetValue("Start Date", out var startDates) && DateTime.TryParse(startDates.FirstOrDefault(), out var startDate))
+            {
+                conditions.Add("sd.Date >= @StartDate");
+                parameters.Add(new SqliteParameter("@StartDate", startDate));
+            }
+
+            if (filters.TryGetValue("End Date", out var endDates) && DateTime.TryParse(endDates.FirstOrDefault(), out var endDate))
+            {
+                conditions.Add("sd.Date <= @EndDate");
+                parameters.Add(new SqliteParameter("@EndDate", endDate));
+            }
+
+            string whereClause = conditions.Count > 0 ? string.Join(matchMode == "MatchAll" ? " AND " : " OR ", conditions) : "1=1";
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql.Replace("{conditions}", whereClause);
+
+            foreach (var param in parameters)
+                command.Parameters.Add(param);
+
+            using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                matchingSectionIds.Add(reader.GetString(0));
+            }
+
+            return matchingSectionIds;
+        }
 
 
     }
