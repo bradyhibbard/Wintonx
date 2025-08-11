@@ -16,6 +16,17 @@
 # Mono auto generated files
 mono_crash.*
 
+bin/
+obj/
+publish/
+Published/
+dist/
+Installer/
+*.exe
+*.msi
+*.zip
+
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -361,3 +372,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# VS noise
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
