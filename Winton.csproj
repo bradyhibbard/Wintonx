@@ -9,6 +9,9 @@
 	    <PublishSingleFile>true</PublishSingleFile>
 	    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
 	    <PublishDir>C:\Users\sbhib\source\repos\Winton\Winton\Published\</PublishDir>
+		<Version>1.0.0</Version>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
     </PropertyGroup>
 
   <ItemGroup>

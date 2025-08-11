@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using Winton.Services;
+using Winton.Views;
 
 namespace Winton.Views
 {
@@ -44,14 +45,14 @@ namespace Winton.Views
         {
             try
             {
-                var updateChecker = new UpdateChecker();
-                string result = await updateChecker.UpdateApplication();  // Call the update logic from the UpdateChecker class
-                MessageBox.Show(result, "Update", MessageBoxButton.OK, MessageBoxImage.Information);  // Display the result of the update check
+                await new UpdateChecker().ManualCheckAsync();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during update: {ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);  // Show error if any exception occurs
+                MessageBox.Show($"Error during update: {ex.Message}",
+                                "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
     }
 }

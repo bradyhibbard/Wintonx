@@ -1,117 +1,266 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
 namespace Winton.Views
 {
+    /// <summary>
+    /// GitHub Release-based updater for WPF (.NET).
+    /// - Auto-checks on startup (throttled to once/day via %LocalAppData%\Winton\update_state.json).
+    /// - Compares against AssemblyInformationalVersion (fallback: AssemblyVersion).
+    /// - Prompts user; downloads & launches best asset (.appinstaller/.msix/.exe/.zip fallback).
+    /// </summary>
     public class UpdateChecker
     {
-        private const string GitHubApiUrl = "https://api.github.com/repos/bradyhibbard/Winton/releases/latest";
-        private const string CurrentVersion = "v1.0.0"; // Replace with actual app version
-        private const string DownloadFolder = "C:\\Temp\\WintonUpdate";  // Temp download folder for the update
+        // TODO: Confirm these to match your repo
+        private const string Owner = "bradyhibbard";
+        private const string Repo = "Wintonx";
+        private static readonly string LatestReleaseUrl = $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
-        // Replace this with your GitHub Personal Access Token (keep it secure)
-        private const string GitHubToken = "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"; // Add your GitHub token here
+        private static readonly string AppFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Winton");
+        private static readonly string StatePath = Path.Combine(AppFolder, "update_state.json");
 
-        public async Task<string> UpdateApplication()
+        private static readonly HttpClient Http = BuildHttpClient();
+
+        public record UpdateState([property: JsonPropertyName("last_check_utc")] DateTime? LastCheckUtc);
+        public record GithubAsset(
+            [property: JsonPropertyName("name")] string Name,
+            [property: JsonPropertyName("browser_download_url")] string DownloadUrl);
+        public record GithubRelease(
+            [property: JsonPropertyName("tag_name")] string TagName,
+            [property: JsonPropertyName("prerelease")] bool PreRelease,
+            [property: JsonPropertyName("draft")] bool Draft,
+            [property: JsonPropertyName("assets")] GithubAsset[] Assets);
+
+        /// <summary>Call on startup. Will silently skip if already checked today.</summary>
+        public async Task AutoCheckOnStartupAsync(bool showNoUpdateToast = false, CancellationToken ct = default)
         {
-            using (var client = new HttpClient())
+            try
             {
-                // Set up the request headers
-                client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("WintonApp", "1.0"));
+                if (!ShouldCheckToday())
+                    return;
 
-                // Add the Authorization header with the GitHub token (for private repositories or avoiding rate limits)
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", GitHubToken);
+                var result = await CheckForUpdateAsync(ct);
+                SaveLastCheck();
 
-                HttpResponseMessage response = await client.GetAsync(GitHubApiUrl);
-
-                if (!response.IsSuccessStatusCode)
+                if (result is null)
                 {
-                    return $"Failed to check for updates. Status code: {response.StatusCode}";
+                    if (showNoUpdateToast)
+                        ShowInfo("You're on the latest version.");
+                    return;
                 }
 
-                // Parse the response
-                string jsonResponse = await response.Content.ReadAsStringAsync();
-                var latestRelease = JsonSerializer.Deserialize<GitHubRelease>(jsonResponse);
-
-                // Compare versions
-                if (latestRelease.TagName == CurrentVersion)
+                var (latestVersion, asset) = result.Value;
+                var msg = $"A new version {latestVersion} is available.\n\nDownload and install now?";
+                var choice = MessageBox.Show(msg, "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
+                if (choice == MessageBoxResult.Yes)
                 {
-                    return "You are already using the latest version.";
+                    await DownloadAndInstallAsync(asset, ct);
                 }
-
-                // Download the release asset
-                var asset = latestRelease.Assets[0];  // Assuming the first asset is the correct one
-                string downloadUrl = asset.BrowserDownloadUrl;
-
-                await DownloadAndInstallUpdate(downloadUrl, asset.Name);
-                return "Update downloaded and installed.";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[UpdateChecker] AutoCheck failed: {ex}");
+                // swallow on startup
             }
         }
 
-        private async Task DownloadAndInstallUpdate(string downloadUrl, string fileName)
+        /// <summary>Call from a menu item or button: runs a check immediately.</summary>
+        public async Task ManualCheckAsync(CancellationToken ct = default)
         {
-            if (!Directory.Exists(DownloadFolder))
+            try
             {
-                Directory.CreateDirectory(DownloadFolder);
-            }
+                var result = await CheckForUpdateAsync(ct);
+                SaveLastCheck();
 
-            string downloadFilePath = Path.Combine(DownloadFolder, fileName);
-
-            // Download the file
-            using (var client = new HttpClient())
-            {
-                var downloadStream = await client.GetStreamAsync(downloadUrl);
-                using (var fileStream = new FileStream(downloadFilePath, FileMode.Create))
+                if (result is null)
                 {
-                    await downloadStream.CopyToAsync(fileStream);
+                    ShowInfo("You're on the latest version.");
+                    return;
+                }
+
+                var (latestVersion, asset) = result.Value;
+                var msg = $"A new version {latestVersion} is available.\n\nDownload and install now?";
+                var choice = MessageBox.Show(msg, "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
+                if (choice == MessageBoxResult.Yes)
+                {
+                    await DownloadAndInstallAsync(asset, ct);
                 }
             }
-
-            // Unzip the file if it's a zip archive
-            if (fileName.EndsWith(".zip"))
+            catch (Exception ex)
             {
-                string extractPath = Path.Combine(DownloadFolder, "extracted");
-                ZipFile.ExtractToDirectory(downloadFilePath, extractPath);
-
-                ReplaceApplication(extractPath);
+                ShowError($"Update check failed:\n\n{ex.Message}");
             }
         }
 
-        private void ReplaceApplication(string extractPath)
+        private static HttpClient BuildHttpClient()
         {
-            string appExecutablePath = Path.Combine(extractPath, "Winton.exe");
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.UserAgent.Clear();
+            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Winton", GetCurrentVersionString()));
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            client.Timeout = TimeSpan.FromSeconds(20);
+            return client;
+        }
 
-            // Run the new executable (installer or replace the current executable)
-            ProcessStartInfo processStartInfo = new ProcessStartInfo
+        private static Version GetCurrentVersion()
+        {
+            var asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+            var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (!string.IsNullOrWhiteSpace(info) && Version.TryParse(TrimVersionPrefix(info), out var v1))
+                return v1;
+
+            var v = asm.GetName().Version ?? new Version(0, 0, 0, 0);
+            return new Version(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
+        }
+
+        private static string GetCurrentVersionString() => GetCurrentVersion().ToString();
+
+        private static string TrimVersionPrefix(string v) =>
+            v.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? v[1..] : v;
+
+        private async Task<(Version latestVersion, GithubAsset asset)?> CheckForUpdateAsync(CancellationToken ct)
+        {
+            var current = GetCurrentVersion();
+            var release = await GetLatestReleaseAsync(ct);
+            if (release is null || release.Draft) return null;
+
+            var latestTag = TrimVersionPrefix(release.TagName ?? "");
+            if (!Version.TryParse(latestTag, out var latest)) return null;
+
+            if (latest <= current) return null;
+
+            var asset = ChooseBestAsset(release.Assets);
+            if (asset is null) return null;
+
+            return (latest, asset);
+        }
+
+        private static GithubAsset? ChooseBestAsset(GithubAsset[] assets)
+        {
+            if (assets is null || assets.Length == 0) return null;
+
+            // Prefer appinstaller/msix → exe → zip
+            GithubAsset? pick = null;
+            pick ??= Array.Find(assets, a => a.Name.EndsWith(".appinstaller", StringComparison.OrdinalIgnoreCase));
+            pick ??= Array.Find(assets, a => a.Name.EndsWith(".msix", StringComparison.OrdinalIgnoreCase) || a.Name.EndsWith(".msixbundle", StringComparison.OrdinalIgnoreCase));
+            pick ??= Array.Find(assets, a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            pick ??= Array.Find(assets, a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            return pick;
+        }
+
+        private async Task<GithubRelease?> GetLatestReleaseAsync(CancellationToken ct)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, LatestReleaseUrl);
+            using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            resp.EnsureSuccessStatusCode();
+            await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            var release = await JsonSerializer.DeserializeAsync<GithubRelease>(stream, new JsonSerializerOptions
             {
-                FileName = appExecutablePath,
-                UseShellExecute = true
+                PropertyNameCaseInsensitive = true
+            }, ct);
+            return release;
+        }
+
+        private async Task DownloadAndInstallAsync(GithubAsset asset, CancellationToken ct)
+        {
+            // Best UX: let Windows handle appinstaller/msix
+            if (asset.Name.EndsWith(".appinstaller", StringComparison.OrdinalIgnoreCase) ||
+                asset.Name.EndsWith(".msix", StringComparison.OrdinalIgnoreCase) ||
+                asset.Name.EndsWith(".msixbundle", StringComparison.OrdinalIgnoreCase))
+            {
+                LaunchUrl(asset.DownloadUrl);
+                Application.Current?.Shutdown();
+                return;
+            }
+
+            // Otherwise: download to temp and run
+            var tempDir = Path.Combine(Path.GetTempPath(), "Winton_Update");
+            Directory.CreateDirectory(tempDir);
+            var destPath = Path.Combine(tempDir, asset.Name);
+
+            await DownloadFileAsync(asset.DownloadUrl, destPath, ct);
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = destPath,
+                    UseShellExecute = true,
+                    Verb = "open",
+                };
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Failed to launch installer:\n{ex.Message}");
+                return;
+            }
+
+            Application.Current?.Shutdown();
+        }
+
+        private static async Task DownloadFileAsync(string url, string destPath, CancellationToken ct)
+        {
+            using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+            resp.EnsureSuccessStatusCode();
+            await using var input = await resp.Content.ReadAsStreamAsync(ct);
+            await using var output = File.Create(destPath);
+            await input.CopyToAsync(output, ct);
+        }
+
+        private static void LaunchUrl(string url)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true,
+                Verb = "open"
             };
-
-            // Optionally kill the current process before starting the update
-            Process.Start(processStartInfo);
-
-            // Optionally: Kill the current application after launching the update
-            Application.Current.Shutdown();
+            Process.Start(psi);
         }
 
-        private class GitHubRelease
+        private static bool ShouldCheckToday()
         {
-            public string TagName { get; set; }
-            public GitHubAsset[] Assets { get; set; }
+            try
+            {
+                if (!File.Exists(StatePath)) return true;
+                var json = File.ReadAllText(StatePath);
+                var state = JsonSerializer.Deserialize<UpdateState>(json);
+                if (state?.LastCheckUtc is null) return true;
+                return (DateTime.UtcNow - state.LastCheckUtc.Value) > TimeSpan.FromDays(1);
+            }
+            catch
+            {
+                return true;
+            }
         }
 
-        private class GitHubAsset
+        private static void SaveLastCheck()
         {
-            public string Name { get; set; }
-            public string BrowserDownloadUrl { get; set; }
+            try
+            {
+                Directory.CreateDirectory(AppFolder);
+                var json = JsonSerializer.Serialize(new UpdateState(DateTime.UtcNow));
+                File.WriteAllText(StatePath, json);
+            }
+            catch { /* noop */ }
         }
+
+        private static void ShowInfo(string msg) =>
+            MessageBox.Show(msg, "Winton", MessageBoxButton.OK, MessageBoxImage.Information);
+
+        private static void ShowError(string msg) =>
+            MessageBox.Show(msg, "Winton", MessageBoxButton.OK, MessageBoxImage.Error);
     }
 }
