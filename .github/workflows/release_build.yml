@@ -15,9 +15,9 @@ jobs:
     env:
       WORKSPACE: ${{ github.workspace }}
       APP_NAME: Wintonx
-      PUBLISH_DIR: ${{ github.workspace }}\publish
-      INSTALLER_DIR: ${{ github.workspace }}\dist
-      ISS_PATH: ${{ github.workspace }}\installer\Wintonx.ci.iss
+      PUBLISH_DIR: ${{ github.workspace }}/publish
+      INSTALLER_DIR: ${{ github.workspace }}/installer_out
+      ISS_PATH: ${{ github.workspace }}/installer/Wintonx.ci.iss
 
     steps:
       - name: Checkout
@@ -72,29 +72,30 @@ jobs:
       - name: Build installer with Inno Setup
         shell: pwsh
         run: |
-          Write-Host "Expected ISS path: $env:ISS_PATH"
-          if (-not (Test-Path "$env:ISS_PATH")) {
-            Write-Host "Repo tree (recursive, for debugging):"
-            Get-ChildItem -Recurse -Force "$env:WORKSPACE" | Select-Object FullName
-            throw "Missing ISS script: $env:ISS_PATH"
-          }
+            Write-Host "ISS expected at: $env:ISS_PATH"
+            if (-not (Test-Path "$env:ISS_PATH")) { throw "Missing ISS script: $env:ISS_PATH" }
 
-          New-Item -ItemType Directory -Force -Path "$env:INSTALLER_DIR" | Out-Null
+            # Ensure output dir exists
+            New-Item -ItemType Directory -Force -Path "$env:INSTALLER_DIR" | Out-Null
 
-          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+            $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+            if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
 
-          & "$iscc" `
-            "/DMyAppName=$env:APP_NAME" `
-            "/DMyAppVersion=${{ steps.getver.outputs.version }}" `
-            "/DMyPublishDir=""$([System.IO.Path]::GetFullPath($env:PUBLISH_DIR))""" `
-            "/DMyOutputDir=""$([System.IO.Path]::GetFullPath($env:INSTALLER_DIR))""" `
-            "$env:ISS_PATH"
+            # Resolve absolute paths (no quotes inside quotes)
+            $PublishDir = [System.IO.Path]::GetFullPath($env:PUBLISH_DIR)
+            $OutDir     = [System.IO.Path]::GetFullPath($env:INSTALLER_DIR)
 
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Host "PublishDir => $PublishDir"
+            Write-Host "OutDir     => $OutDir"
 
-          Write-Host "Installer output:"
-          Get-ChildItem -Recurse "$env:INSTALLER_DIR"
+            & "$iscc" `
+              /DMyAppName=$env:APP_NAME `
+              /DMyAppVersion=${{ steps.getver.outputs.version }} `
+              /DMyPublishDir=$PublishDir `
+              /DMyOutputDir=$OutDir `
+              "$env:ISS_PATH"
+
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Create tag (vX.Y.Z)
         id: tag
@@ -115,6 +116,6 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
-          files: "${{ env.INSTALLER_DIR }}\*.exe"
+          files: "${{ env.INSTALLER_DIR }}/*.exe"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
