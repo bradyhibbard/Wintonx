@@ -2,8 +2,9 @@
     <PropertyGroup>
 	    <OutputType>WinExe</OutputType>
 	    <TargetFramework>net8.0-windows</TargetFramework>
-	    <Nullable>disable</Nullable>
+	    <Nullable>enable</Nullable>
 	    <ImplicitUsings>enable</ImplicitUsings>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 	    <UseWPF>true</UseWPF>
 	    <SelfContained>true</SelfContained>
 	    <PublishSingleFile>true</PublishSingleFile>
