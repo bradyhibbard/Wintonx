@@ -2,18 +2,22 @@ name: Release on master (WPF + Inno Setup)
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   workflow_dispatch:
+
+permissions:
+  contents: write   # required for tagging + creating a release
 
 jobs:
   build-release:
     runs-on: windows-latest
 
     env:
+      WORKSPACE: ${{ github.workspace }}
       APP_NAME: Wintonx
-      PUBLISH_DIR: ./publish
-      INSTALLER_DIR: ./installer_out
-      ISS_PATH: ./installer/Wintonx.ci.iss
+      PUBLISH_DIR: ${{ github.workspace }}\publish
+      INSTALLER_DIR: ${{ github.workspace }}\dist
+      ISS_PATH: ${{ github.workspace }}\installer\Wintonx.ci.iss
 
     steps:
       - name: Checkout
@@ -24,13 +28,16 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Dotnet info (diagnostic)
+        run: dotnet --info
+
       - name: Find .csproj
         id: findproj
         shell: pwsh
         run: |
           $proj = Get-ChildItem -Recurse -Filter *.csproj | Select-Object -First 1
-          if (-not $proj) { Write-Error "No .csproj found" }
-          echo "path=$($proj.FullName)" >> $env:GITHUB_OUTPUT
+          if (-not $proj) { throw "No .csproj found" }
+          "path=$($proj.FullName)" >> $env:GITHUB_OUTPUT
           Write-Host "Using project: $($proj.FullName)"
 
       - name: Get version from csproj
@@ -39,20 +46,24 @@ jobs:
         run: |
           [xml]$xml = Get-Content "${{ steps.findproj.outputs.path }}"
           $ver = ($xml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -Last 1).Version
-          if (-not $ver) { Write-Error "No <Version> found in csproj" }
-          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          if (-not $ver) { throw "No <Version> found in csproj" }
+          "version=$ver" >> $env:GITHUB_OUTPUT
           Write-Host "Detected version: $ver"
 
       - name: Restore
         run: dotnet restore "${{ steps.findproj.outputs.path }}"
 
-      - name: Publish (Release to ./publish)
+      - name: Publish (Release to /publish)
         run: dotnet publish "${{ steps.findproj.outputs.path }}" -c Release -o "${{ env.PUBLISH_DIR }}"
 
-      - name: List publish output (diagnostic)
+      - name: List repo + publish output (diagnostic)
         shell: pwsh
         run: |
-          if (-not (Test-Path "${{ env.PUBLISH_DIR }}")) { Write-Error "Publish dir missing: $env:PUBLISH_DIR" }
+          Write-Host "Workspace: $env:WORKSPACE"
+          Write-Host "Repo tree (top level):"
+          Get-ChildItem $env:WORKSPACE
+          if (-not (Test-Path "${{ env.PUBLISH_DIR }}")) { throw "Publish dir missing: $env:PUBLISH_DIR" }
+          Write-Host "`nPublish tree:"
           Get-ChildItem -Recurse "${{ env.PUBLISH_DIR }}"
 
       - name: Install Inno Setup
@@ -61,19 +72,29 @@ jobs:
       - name: Build installer with Inno Setup
         shell: pwsh
         run: |
-          if (-not (Test-Path "${{ env.ISS_PATH }}")) { Write-Error "Missing ISS script: $env:ISS_PATH" }
+          Write-Host "Expected ISS path: $env:ISS_PATH"
+          if (-not (Test-Path "$env:ISS_PATH")) {
+            Write-Host "Repo tree (recursive, for debugging):"
+            Get-ChildItem -Recurse -Force "$env:WORKSPACE" | Select-Object FullName
+            throw "Missing ISS script: $env:ISS_PATH"
+          }
 
-          New-Item -ItemType Directory -Force -Path "${{ env.INSTALLER_DIR }}" | Out-Null
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { Write-Error "ISCC.exe not found at $iscc" }
+          New-Item -ItemType Directory -Force -Path "$env:INSTALLER_DIR" | Out-Null
+
+          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
 
           & "$iscc" `
-            "/DMyAppName=${{ env.APP_NAME }}" `
+            "/DMyAppName=$env:APP_NAME" `
             "/DMyAppVersion=${{ steps.getver.outputs.version }}" `
-            "/DMyPublishDir=""$(Resolve-Path '${{ env.PUBLISH_DIR }}')""" `
-            "/DMyOutputDir=""$(Resolve-Path '${{ env.INSTALLER_DIR }}')""" `
-            "${{ env.ISS_PATH }}"
+            "/DMyPublishDir=""$([System.IO.Path]::GetFullPath($env:PUBLISH_DIR))""" `
+            "/DMyOutputDir=""$([System.IO.Path]::GetFullPath($env:INSTALLER_DIR))""" `
+            "$env:ISS_PATH"
+
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          Write-Host "Installer output:"
+          Get-ChildItem -Recurse "$env:INSTALLER_DIR"
 
       - name: Create tag (vX.Y.Z)
         id: tag
@@ -87,13 +108,13 @@ jobs:
             git tag $tag
             git push origin $tag
           }
-          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
-          files: "${{ env.INSTALLER_DIR }}/${{ env.APP_NAME }}-Setup-${{ steps.getver.outputs.version }}.exe"
+          files: "${{ env.INSTALLER_DIR }}\*.exe"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
