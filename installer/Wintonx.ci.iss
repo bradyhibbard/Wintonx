@@ -2,7 +2,7 @@
 ; Defines passed by CI:
 ;   MyAppName, MyAppVersion, MyPublishDir, MyOutputDir
 
-#define MyAppName     GetStringDef("MyAppName", "Wintonx")
+#define MyAppName     GetStringDef("MyAppName", "Winton")
 #define MyAppVersion  GetStringDef("MyAppVersion", "0.0.0")
 #define MyPublishDir  GetStringDef("MyPublishDir", ".\\publish")
 #define MyOutputDir   GetStringDef("MyOutputDir", ".\\installer_out")
