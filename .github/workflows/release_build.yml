@@ -14,11 +14,8 @@ jobs:
 
     env:
       WORKSPACE: ${{ github.workspace }}
-      # Display/installer product name
       APP_NAME: Wintonx
-      # Dotnet publish output exe name (project is "Winton")
       APP_EXE_NAME: Winton.exe
-      # Absolute-ish paths (resolved again in steps)
       PUBLISH_DIR: ${{ github.workspace }}/publish
       INSTALLER_DIR: ${{ github.workspace }}/installer_out
       ISS_PATH: ${{ github.workspace }}/installer/Wintonx.ci.iss
@@ -87,35 +84,57 @@ jobs:
       - name: Build installer with Inno Setup
         shell: pwsh
         run: |
-          $ws        = $env:GITHUB_WORKSPACE
-          $iss       = Join-Path $ws 'installer\Wintonx.ci.iss'
-          $publish   = Join-Path $ws 'publish'
-          $out       = Join-Path $ws 'installer_out'
+            $ws      = $env:GITHUB_WORKSPACE
+            $iss     = Join-Path $ws 'installer\Wintonx.ci.iss'
+            $publish = Join-Path $ws 'publish'
+            $out     = Join-Path $ws 'installer_out'
 
-          Write-Host "ISS expected at: $iss"
-          if (-not (Test-Path $iss)) { throw "Missing ISS script: $iss" }
+            Write-Host "ISS expected at: $iss"
+            if (-not (Test-Path $iss)) { throw "Missing ISS script: $iss" }
 
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
+            New-Item -ItemType Directory -Force -Path $out | Out-Null
 
-          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+            # --- robust ISCC discovery ---
+            $candidates = @(
+                "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+                "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+            )
+            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $iscc) {
+                $cmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
+                if ($cmd) { $iscc = $cmd.Source }
+            }
+            if (-not $iscc) {
+                Write-Host "Tried:" ($candidates -join " | ")
+                throw "ISCC.exe not found on runner"
+            }
+            Write-Host "Using ISCC at: $iscc"
+            # --------------------------------
 
-          Write-Host "PublishDir => $publish"
-          Write-Host "OutDir     => $out"
-          Write-Host "App EXE    => $env:APP_EXE_NAME"
+            Write-Host "PublishDir => $publish"
+            Write-Host "OutDir     => $out"
+            Write-Host "App EXE    => $env:APP_EXE_NAME"
 
-          & $iscc `
-            /DMyAppName=Wintonx `
-            /DMyAppVersion=${{ steps.getver.outputs.version }} `
-            /DMyPublishDir=$publish `
-            /DMyOutputDir=$out `
-            /DMyAppExeName=$env:APP_EXE_NAME `
-            $iss
+            & $iscc `
+                /DMyAppName=Wintonx `
+                /DMyAppVersion=${{ steps.getver.outputs.version }} `
+                /DMyPublishDir=$publish `
+                /DMyOutputDir=$out `
+                /DMyAppExeName=$env:APP_EXE_NAME `
+                $iss
 
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          Write-Host "Installer output:"
-          Get-ChildItem -Recurse $out
+            Write-Host "Installer output:"
+            Get-ChildItem -Recurse $out
+
+      - name: Locate ISCC (debug)
+        shell: pwsh
+        run: |
+          Get-Command iscc.exe -ErrorAction SilentlyContinue | Format-List
+          Get-ChildItem 'C:\Program Files*\Inno Setup 6' -ErrorAction SilentlyContinue
+
+
 
       - name: Create tag (vX.Y.Z)
         id: tag
