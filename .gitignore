@@ -21,7 +21,6 @@ obj/
 publish/
 Published/
 dist/
-Installer/
 *.exe
 *.msi
 *.zip
