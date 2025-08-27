@@ -1,4 +1,4 @@
-name: Release on master (WPF + Inno Setup)
+﻿name: Release on master (WPF + Inno Setup)
 
 on:
   push:
@@ -14,11 +14,11 @@ jobs:
 
     env:
       WORKSPACE: ${{ github.workspace }}
-      # Display/installer product name (menus, installer name)
+      # Display/installer product name
       APP_NAME: Wintonx
-      # Actual exe produced by dotnet publish (project name is "Winton")
+      # Dotnet publish output exe name (project is "Winton")
       APP_EXE_NAME: Winton.exe
-      # Absolute paths to avoid working-dir ambiguity
+      # Absolute-ish paths (resolved again in steps)
       PUBLISH_DIR: ${{ github.workspace }}/publish
       INSTALLER_DIR: ${{ github.workspace }}/installer_out
       ISS_PATH: ${{ github.workspace }}/installer/Wintonx.ci.iss
@@ -64,57 +64,59 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Workspace: $env:WORKSPACE"
-          Write-Host "Top-level repo contents:"; Get-ChildItem $env:WORKSPACE
+          Write-Host "Top-level repo contents:"
+          Get-ChildItem $env:WORKSPACE
           if (-not (Test-Path "$env:PUBLISH_DIR")) { throw "Publish dir missing: $env:PUBLISH_DIR" }
-          Write-Host "`nPublish tree:"; Get-ChildItem -Recurse "$env:PUBLISH_DIR"
+          Write-Host "`nPublish tree:"
+          Get-ChildItem -Recurse "$env:PUBLISH_DIR"
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
 
+      # 🔎 DEBUG: prove the .iss exists *in the runner's checkout*
+      - name: Debug - prove the .iss exists
+        shell: pwsh
+        run: |
+          $ws  = $env:GITHUB_WORKSPACE
+          $iss = Join-Path $ws 'installer\Wintonx.ci.iss'
+          Write-Host "Workspace: $ws"
+          Write-Host "Expecting ISS at: $iss"
+          Write-Host "`nAny .iss files in workspace:"
+          Get-ChildItem -Recurse -Force $ws -Filter *.iss | Select-Object FullName
+          if (-not (Test-Path $iss)) { throw "CI cannot see $iss" }
+
       - name: Build installer with Inno Setup
         shell: pwsh
         run: |
-          Write-Host "ISS expected at: $env:ISS_PATH"
-          if (-not (Test-Path "$env:ISS_PATH")) {
-            Get-ChildItem -Recurse -Force "$env:WORKSPACE" | Select-Object FullName
-            throw "Missing ISS script: $env:ISS_PATH"
-          }
+          $ws        = $env:GITHUB_WORKSPACE
+          $iss       = Join-Path $ws 'installer\Wintonx.ci.iss'
+          $publish   = Join-Path $ws 'publish'
+          $out       = Join-Path $ws 'installer_out'
 
-          New-Item -ItemType Directory -Force -Path "$env:INSTALLER_DIR" | Out-Null
+          Write-Host "ISS expected at: $iss"
+          if (-not (Test-Path $iss)) { throw "Missing ISS script: $iss" }
+
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
 
           $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
 
-          $PublishDir = [System.IO.Path]::GetFullPath($env:PUBLISH_DIR)
-          $OutDir     = [System.IO.Path]::GetFullPath($env:INSTALLER_DIR)
-          Write-Host "PublishDir => $PublishDir"
-          Write-Host "OutDir     => $OutDir"
+          Write-Host "PublishDir => $publish"
+          Write-Host "OutDir     => $out"
           Write-Host "App EXE    => $env:APP_EXE_NAME"
 
-          - name: Debug: prove the .iss exists
-          shell: pwsh
-          run: |
-            Write-Host "Workspace: $env:GITHUB_WORKSPACE"
-            Write-Host "`nTop-level:"
-            Get-ChildItem $env:GITHUB_WORKSPACE
-            Write-Host "`nAny .iss files in workspace:"
-            Get-ChildItem -Recurse -Force $env:GITHUB_WORKSPACE -Filter *.iss | Select-Object FullName
-            if (-not (Test-Path "$env:GITHUB_WORKSPACE\installer\Wintonx.ci.iss")) {
-              throw "CI cannot see installer\Wintonx.ci.iss"
-            }
-
-          & "$iscc" `
-            /DMyAppName=$env:APP_NAME `
+          & $iscc `
+            /DMyAppName=${env:APP_NAME} `
             /DMyAppVersion=${{ steps.getver.outputs.version }} `
-            /DMyPublishDir=$PublishDir `
-            /DMyOutputDir=$OutDir `
-            /DMyAppExeName=Winton.exe `
-            "$env:ISS_PATH"
+            /DMyPublishDir=$publish `
+            /DMyOutputDir=$out `
+            /DMyAppExeName=$env:APP_EXE_NAME `
+            $iss
 
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           Write-Host "Installer output:"
-          Get-ChildItem -Recurse "$env:INSTALLER_DIR"
+          Get-ChildItem -Recurse $out
 
       - name: Create tag (vX.Y.Z)
         id: tag
@@ -135,6 +137,6 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
-          files: ${{ env.INSTALLER_DIR }}/*.exe   # use forward slashes; no quotes
+          files: ${{ env.INSTALLER_DIR }}/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
