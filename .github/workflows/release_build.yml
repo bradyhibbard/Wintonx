@@ -96,7 +96,7 @@ jobs:
             /DMyAppVersion=${{ steps.getver.outputs.version }} `
             /DMyPublishDir=$PublishDir `
             /DMyOutputDir=$OutDir `
-            /DMyAppExeName=$env:APP_EXE_NAME `
+            /DMyAppExeName=Winton.exe `
             "$env:ISS_PATH"
 
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

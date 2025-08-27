@@ -6,7 +6,7 @@
 #define MyAppVersion  GetStringDef("MyAppVersion", "0.0.0")
 #define MyPublishDir  GetStringDef("MyPublishDir", ".\\publish")
 #define MyOutputDir   GetStringDef("MyOutputDir", ".\\installer_out")
-#define MyAppExeName  MyAppName + ".exe"
+#define MyAppExeName  GetStringDef("MyAppExeName", MyAppName + ".exe")
 
 [Setup]
 AppId={{1F75C715-9D8E-4B77-9D1E-9C5B8E0A0ABC}
