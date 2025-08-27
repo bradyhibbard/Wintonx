@@ -9,8 +9,9 @@
 	    <SelfContained>true</SelfContained>
 	    <PublishSingleFile>true</PublishSingleFile>
 	    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-	    <PublishDir>C:\Users\BradyHibbard\source\repos\Wintonx\Wintonx\Published\</PublishDir>
 		<Version>1.0.0</Version>
+		<AssemblyName>Wintonx</AssemblyName>
+		<RootNamespace>Wintonx</RootNamespace>
 		<AssemblyVersion>1.0.0.0</AssemblyVersion>
 		<FileVersion>1.0.0.0</FileVersion>
     </PropertyGroup>
