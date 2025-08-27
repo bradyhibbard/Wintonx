@@ -2,11 +2,24 @@
 ; Defines passed by CI:
 ;   MyAppName, MyAppVersion, MyPublishDir, MyOutputDir
 
-#define MyAppName     GetStringDef("MyAppName", "Winton")
-#define MyAppVersion  GetStringDef("MyAppVersion", "0.0.0")
-#define MyPublishDir  GetStringDef("MyPublishDir", ".\\publish")
-#define MyOutputDir   GetStringDef("MyOutputDir", ".\\installer_out")
-#define MyAppExeName  GetStringDef("MyAppExeName", MyAppName + ".exe")
+; ---- defaults, overridden by /D... passed from ISCC ----
+#ifndef MyAppName
+  #define MyAppName "Wintonx"
+#endif
+#ifndef MyAppVersion
+  #define MyAppVersion "1.0.0"
+#endif
+#ifndef MyPublishDir
+  #define MyPublishDir "publish"
+#endif
+#ifndef MyOutputDir
+  #define MyOutputDir "installer_out"
+#endif
+#ifndef MyAppExeName
+  #define MyAppExeName "Wintonx.exe"
+#endif
+; --------------------------------------------------------
+)
 
 [Setup]
 AppId={{1F75C715-9D8E-4B77-9D1E-9C5B8E0A0ABC}
