@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # required for tagging + creating a release
+  contents: write
 
 jobs:
   build-release:
@@ -14,7 +14,11 @@ jobs:
 
     env:
       WORKSPACE: ${{ github.workspace }}
+      # Display/installer product name (menus, installer name)
       APP_NAME: Wintonx
+      # Actual exe produced by dotnet publish (project name is "Winton")
+      APP_EXE_NAME: Winton.exe
+      # Absolute paths to avoid working-dir ambiguity
       PUBLISH_DIR: ${{ github.workspace }}/publish
       INSTALLER_DIR: ${{ github.workspace }}/installer_out
       ISS_PATH: ${{ github.workspace }}/installer/Wintonx.ci.iss
@@ -60,11 +64,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Workspace: $env:WORKSPACE"
-          Write-Host "Repo tree (top level):"
-          Get-ChildItem $env:WORKSPACE
-          if (-not (Test-Path "${{ env.PUBLISH_DIR }}")) { throw "Publish dir missing: $env:PUBLISH_DIR" }
-          Write-Host "`nPublish tree:"
-          Get-ChildItem -Recurse "${{ env.PUBLISH_DIR }}"
+          Write-Host "Top-level repo contents:"; Get-ChildItem $env:WORKSPACE
+          if (-not (Test-Path "$env:PUBLISH_DIR")) { throw "Publish dir missing: $env:PUBLISH_DIR" }
+          Write-Host "`nPublish tree:"; Get-ChildItem -Recurse "$env:PUBLISH_DIR"
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
@@ -72,30 +74,35 @@ jobs:
       - name: Build installer with Inno Setup
         shell: pwsh
         run: |
-            Write-Host "ISS expected at: $env:ISS_PATH"
-            if (-not (Test-Path "$env:ISS_PATH")) { throw "Missing ISS script: $env:ISS_PATH" }
+          Write-Host "ISS expected at: $env:ISS_PATH"
+          if (-not (Test-Path "$env:ISS_PATH")) {
+            Get-ChildItem -Recurse -Force "$env:WORKSPACE" | Select-Object FullName
+            throw "Missing ISS script: $env:ISS_PATH"
+          }
 
-            # Ensure output dir exists
-            New-Item -ItemType Directory -Force -Path "$env:INSTALLER_DIR" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:INSTALLER_DIR" | Out-Null
 
-            $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
-            if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
 
-            # Resolve absolute paths (no quotes inside quotes)
-            $PublishDir = [System.IO.Path]::GetFullPath($env:PUBLISH_DIR)
-            $OutDir     = [System.IO.Path]::GetFullPath($env:INSTALLER_DIR)
+          $PublishDir = [System.IO.Path]::GetFullPath($env:PUBLISH_DIR)
+          $OutDir     = [System.IO.Path]::GetFullPath($env:INSTALLER_DIR)
+          Write-Host "PublishDir => $PublishDir"
+          Write-Host "OutDir     => $OutDir"
+          Write-Host "App EXE    => $env:APP_EXE_NAME"
 
-            Write-Host "PublishDir => $PublishDir"
-            Write-Host "OutDir     => $OutDir"
+          & "$iscc" `
+            /DMyAppName=$env:APP_NAME `
+            /DMyAppVersion=${{ steps.getver.outputs.version }} `
+            /DMyPublishDir=$PublishDir `
+            /DMyOutputDir=$OutDir `
+            /DMyAppExeName=$env:APP_EXE_NAME `
+            "$env:ISS_PATH"
 
-            & "$iscc" `
-              /DMyAppName=$env:APP_NAME `
-              /DMyAppVersion=${{ steps.getver.outputs.version }} `
-              /DMyPublishDir=$PublishDir `
-              /DMyOutputDir=$OutDir `
-              "$env:ISS_PATH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Installer output:"
+          Get-ChildItem -Recurse "$env:INSTALLER_DIR"
 
       - name: Create tag (vX.Y.Z)
         id: tag
@@ -116,6 +123,6 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
-          files: "${{ env.INSTALLER_DIR }}/*.exe"
+          files: ${{ env.INSTALLER_DIR }}/*.exe   # use forward slashes; no quotes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
