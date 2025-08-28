@@ -1,4 +1,4 @@
-﻿name: Release on master (WPF + Inno Setup + NetSparkle appcast)
+﻿name: Release on master (auto-bump patch + Inno + NetSparkle)
 
 on:
   push:
@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
 jobs:
   build-release:
     runs-on: windows-latest
@@ -15,6 +19,7 @@ jobs:
     env:
       WORKSPACE: ${{ github.workspace }}
       APP_NAME: Wintonx
+      # Must match your built exe in /publish
       APP_EXE_NAME: Winton.exe
       PUBLISH_DIR: ${{ github.workspace }}/publish
       INSTALLER_DIR: ${{ github.workspace }}/installer_out
@@ -23,14 +28,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # we need tags
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
-      - name: Dotnet info (diagnostic)
-        run: dotnet --info
+      - name: Determine next version (auto-bump PATCH)
+        id: semver
+        shell: pwsh
+        run: |
+          git fetch --tags --force
+          $tags = git tag --list "v*" | ForEach-Object { $_.Trim() } |
+                  Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } |
+                  Sort-Object { [version]($_.TrimStart('v')) } -Descending
+          if ($tags.Count -gt 0) {
+            $latest = $tags[0].TrimStart('v')
+            $v = [version]$latest
+            $next = [version]::new($v.Major, $v.Minor, $v.Build + 1)
+          } else {
+            $next = [version]"1.0.0"
+          }
+          $fileVer = "$($next.Major).$($next.Minor).$($next.Build).0"
+          "version=$next"     >> $env:GITHUB_OUTPUT
+          "fileversion=$fileVer" >> $env:GITHUB_OUTPUT
+          Write-Host "Latest tag: $($tags[0])  -> Next: v$next"
 
       - name: Find .csproj
         id: findproj
@@ -41,29 +65,21 @@ jobs:
           "path=$($proj.FullName)" >> $env:GITHUB_OUTPUT
           Write-Host "Using project: $($proj.FullName)"
 
-      - name: Get version from csproj
-        id: getver
-        shell: pwsh
-        run: |
-          [xml]$xml = Get-Content "${{ steps.findproj.outputs.path }}"
-          $ver = ($xml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -Last 1).Version
-          if (-not $ver) { throw "No <Version> found in csproj" }
-          "version=$ver" >> $env:GITHUB_OUTPUT
-          Write-Host "Detected version: $ver"
-
       - name: Restore
         run: dotnet restore "${{ steps.findproj.outputs.path }}"
 
-      - name: Publish (Release to /publish)
-        run: dotnet publish "${{ steps.findproj.outputs.path }}" -c Release -o "${{ env.PUBLISH_DIR }}"
+      - name: Publish (Release to /publish) with version override
+        run: >
+          dotnet publish "${{ steps.findproj.outputs.path }}"
+          -c Release -o "${{ env.PUBLISH_DIR }}"
+          -p:Version=${{ steps.semver.outputs.version }}
+          -p:AssemblyVersion=${{ steps.semver.outputs.fileversion }}
+          -p:FileVersion=${{ steps.semver.outputs.fileversion }}
 
-      - name: List repo + publish output (diagnostic)
+      - name: List publish output (diagnostic)
         shell: pwsh
         run: |
-          Write-Host "Workspace: $env:WORKSPACE"
-          Get-ChildItem $env:WORKSPACE
           if (-not (Test-Path "$env:PUBLISH_DIR")) { throw "Publish dir missing: $env:PUBLISH_DIR" }
-          Write-Host "`nPublish tree:"
           Get-ChildItem -Recurse "$env:PUBLISH_DIR"
 
       - name: Install Inno Setup
@@ -77,12 +93,9 @@ jobs:
           $publish = Join-Path $ws 'publish'
           $out     = Join-Path $ws 'installer_out'
 
-          Write-Host "ISS expected at: $iss"
           if (-not (Test-Path $iss)) { throw "Missing ISS script: $iss" }
-
           New-Item -ItemType Directory -Force -Path $out | Out-Null
 
-          # Robust ISCC discovery
           $candidates = @(
             "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
             "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
@@ -92,73 +105,61 @@ jobs:
             $cmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
             if ($cmd) { $iscc = $cmd.Source }
           }
-          if (-not $iscc) {
-            Write-Host "Tried:" ($candidates -join " | ")
-            throw "ISCC.exe not found on runner"
-          }
-          Write-Host "Using ISCC at: $iscc"
-
-          Write-Host "PublishDir => $publish"
-          Write-Host "OutDir     => $out"
-          Write-Host "App EXE    => $env:APP_EXE_NAME"
+          if (-not $iscc) { throw "ISCC.exe not found on runner" }
 
           & $iscc `
             /DMyAppName=${{ env.APP_NAME }} `
-            /DMyAppVersion=${{ steps.getver.outputs.version }} `
+            /DMyAppVersion=${{ steps.semver.outputs.version }} `
             /DMyPublishDir=$publish `
             /DMyOutputDir=$out `
             /DMyAppExeName=$env:APP_EXE_NAME `
             $iss
 
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          Write-Host "Installer output:"
           Get-ChildItem -Recurse $out
 
       - name: Create appcast.xml (NetSparkle)
         shell: pwsh
         run: |
-            $version = "${{ steps.getver.outputs.version }}"
-            $ws = $env:GITHUB_WORKSPACE
-            $outDir = Join-Path $ws 'installer_out'
-            if (-not (Test-Path $outDir)) { throw "Missing installer_out: $outDir" }
+          $version = "${{ steps.semver.outputs.version }}"
+          $ws = $env:GITHUB_WORKSPACE
+          $outDir = Join-Path $ws 'installer_out'
+          if (-not (Test-Path $outDir)) { throw "Missing installer_out: $outDir" }
 
-            # Pick the installer we just built
-            $installer = Get-ChildItem $outDir -Filter '*-Setup-*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if (-not $installer) { $installer = Get-ChildItem $outDir -Filter *.exe | Select-Object -First 1 }
-            if (-not $installer) { throw "Installer .exe not found in $outDir" }
+          $installer = Get-ChildItem $outDir -Filter '*-Setup-*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer) { $installer = Get-ChildItem $outDir -Filter *.exe | Select-Object -First 1 }
+          if (-not $installer) { throw "Installer .exe not found in $outDir" }
 
-            $assetName = $installer.Name
-            $length = (Get-Item $installer.FullName).Length
-            $repo = "${{ github.repository }}"
-            $appcastPath = Join-Path $outDir 'appcast.xml'
+          $assetName = $installer.Name
+          $length = (Get-Item $installer.FullName).Length
+          $repo = "${{ github.repository }}"
+          $appcastPath = Join-Path $outDir 'appcast.xml'
 
-            $lines = @()
-            $lines += '<?xml version="1.0" encoding="utf-8"?>'
-            $lines += '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">'
-            $lines += '  <channel>'
-            $lines += "    <title>$($env:APP_NAME) Updates</title>"
-            $lines += "    <link>https://github.com/$repo</link>"
-            $lines += "    <description>Release feed for $($env:APP_NAME)</description>"
-            $lines += '    <item>'
-            $lines += "      <title>$version</title>"
-            $lines += "      <sparkle:releaseNotesLink>https://github.com/$repo/releases/tag/v$version</sparkle:releaseNotesLink>"
-            $enclosure = "      <enclosure url=""https://github.com/$repo/releases/download/v$version/$assetName"" sparkle:version=""$version"" length=""$length"" type=""application/octet-stream"" />"
-            $lines += $enclosure
-            $lines += '    </item>'
-            $lines += '  </channel>'
-            $lines += '</rss>'
+          $lines = @()
+          $lines += '<?xml version="1.0" encoding="utf-8"?>'
+          $lines += '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">'
+          $lines += '  <channel>'
+          $lines += "    <title>$($env:APP_NAME) Updates</title>"
+          $lines += "    <link>https://github.com/$repo</link>"
+          $lines += "    <description>Release feed for $($env:APP_NAME)</description>"
+          $lines += '    <item>'
+          $lines += "      <title>$version</title>"
+          $lines += "      <sparkle:releaseNotesLink>https://github.com/$repo/releases/tag/v$version</sparkle:releaseNotesLink>"
+          $enclosure = "      <enclosure url=""https://github.com/$repo/releases/download/v$version/$assetName"" sparkle:version=""$version"" length=""$length"" type=""application/octet-stream"" />"
+          $lines += $enclosure
+          $lines += '    </item>'
+          $lines += '  </channel>'
+          $lines += '</rss>'
 
-            Set-Content -Path $appcastPath -Value $lines -Encoding utf8
-            Write-Host "Created: $appcastPath"
-            Get-Content $appcastPath
+          Set-Content -Path $appcastPath -Value $lines -Encoding utf8
+          Write-Host "Created: $appcastPath"
+          Get-Content $appcastPath
 
-
-      - name: Create tag (vX.Y.Z)
+      - name: Create tag vX.Y.Z
         id: tag
         shell: pwsh
         run: |
-          $tag = "v${{ steps.getver.outputs.version }}"
+          $tag = "v${{ steps.semver.outputs.version }}"
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git fetch --tags
@@ -179,17 +180,3 @@ jobs:
             ${{ env.INSTALLER_DIR }}/appcast.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # OPTIONAL: code signing example (requires cert + secret password)
-      # - name: Sign installer (optional)
-      #   if: env.CODESIGN_PFX != ''
-      #   shell: pwsh
-      #   run: |
-      #     $pfx = "$env:GITHUB_WORKSPACE\certs\codesign.pfx"
-      #     $inst = Get-ChildItem "$env:INSTALLER_DIR" -Filter *.exe | Select-Object -First 1
-      #     if ($inst) {
-      #       & "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign `
-      #         /f $pfx /p "${{ secrets.CODESIGN_PFX_PASSWORD }}" `
-      #         /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 `
-      #         $inst.FullName
-      #     }
