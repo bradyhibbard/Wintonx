@@ -15,7 +15,6 @@ jobs:
     env:
       WORKSPACE: ${{ github.workspace }}
       APP_NAME: Wintonx
-      # IMPORTANT: must match your actual exe name in /publish (see csproj)
       APP_EXE_NAME: Winton.exe
       PUBLISH_DIR: ${{ github.workspace }}/publish
       INSTALLER_DIR: ${{ github.workspace }}/installer_out
@@ -119,41 +118,41 @@ jobs:
       - name: Create appcast.xml (NetSparkle)
         shell: pwsh
         run: |
-          $version = "${{ steps.getver.outputs.version }}"
-          $ws = $env:GITHUB_WORKSPACE
-          $outDir = Join-Path $ws 'installer_out'
-          if (-not (Test-Path $outDir)) { throw "Missing installer_out: $outDir" }
+            $version = "${{ steps.getver.outputs.version }}"
+            $ws = $env:GITHUB_WORKSPACE
+            $outDir = Join-Path $ws 'installer_out'
+            if (-not (Test-Path $outDir)) { throw "Missing installer_out: $outDir" }
 
-          # Prefer a name like Wintonx-Setup-<ver>.exe, else first .exe
-          $installer = Get-ChildItem $outDir -Filter '*-Setup-*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          if (-not $installer) { $installer = Get-ChildItem $outDir -Filter *.exe | Select-Object -First 1 }
-          if (-not $installer) { throw "Installer .exe not found in $outDir" }
+            # Pick the installer we just built
+            $installer = Get-ChildItem $outDir -Filter '*-Setup-*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if (-not $installer) { $installer = Get-ChildItem $outDir -Filter *.exe | Select-Object -First 1 }
+            if (-not $installer) { throw "Installer .exe not found in $outDir" }
 
-          $assetName = $installer.Name
-          $length = (Get-Item $installer.FullName).Length
-          $repo = "${{ github.repository }}"
+            $assetName = $installer.Name
+            $length = (Get-Item $installer.FullName).Length
+            $repo = "${{ github.repository }}"
+            $appcastPath = Join-Path $outDir 'appcast.xml'
 
-          $xml = @"
-            <?xml version="1.0" encoding="utf-8"?>
-            <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-              <channel>
-                <title>${{ env.APP_NAME }} Updates</title>
-                <link>https://github.com/$repo</link>
-                <description>Release feed for ${{ env.APP_NAME }}</description>
-                <item>
-                  <title>$version</title>
-                  <sparkle:releaseNotesLink>https://github.com/$repo/releases/tag/v$version</sparkle:releaseNotesLink>
-                  <enclosure url="https://github.com/$repo/releases/download/v$version/$assetName"
-                             sparkle:version="$version"
-                             length="$length"
-                             type="application/octet-stream" />
-                </item>
-              </channel>
-            </rss>
-            "@
-          $appcastPath = Join-Path $outDir 'appcast.xml'
-          $xml | Out-File -FilePath $appcastPath -Encoding utf8
-          Write-Host "Created: $appcastPath"
+            $lines = @()
+            $lines += '<?xml version="1.0" encoding="utf-8"?>'
+            $lines += '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">'
+            $lines += '  <channel>'
+            $lines += "    <title>$($env:APP_NAME) Updates</title>"
+            $lines += "    <link>https://github.com/$repo</link>"
+            $lines += "    <description>Release feed for $($env:APP_NAME)</description>"
+            $lines += '    <item>'
+            $lines += "      <title>$version</title>"
+            $lines += "      <sparkle:releaseNotesLink>https://github.com/$repo/releases/tag/v$version</sparkle:releaseNotesLink>"
+            $enclosure = "      <enclosure url=""https://github.com/$repo/releases/download/v$version/$assetName"" sparkle:version=""$version"" length=""$length"" type=""application/octet-stream"" />"
+            $lines += $enclosure
+            $lines += '    </item>'
+            $lines += '  </channel>'
+            $lines += '</rss>'
+
+            Set-Content -Path $appcastPath -Value $lines -Encoding utf8
+            Write-Host "Created: $appcastPath"
+            Get-Content $appcastPath
+
 
       - name: Create tag (vX.Y.Z)
         id: tag
