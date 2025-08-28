@@ -1,21 +1,34 @@
-﻿using System.Configuration;
-using System.Data;
-using System.Windows;
+﻿using System.Windows;
+using NetSparkleUpdater;
+using NetSparkleUpdater.Enums;
+using NetSparkleUpdater.SignatureVerifiers;
+using NetSparkleUpdater.UI.WPF;
 
 namespace Winton
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
     public partial class App : Application
     {
-        protected override async void OnStartup(StartupEventArgs e)
+        private SparkleUpdater? _updater;
+
+        protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
-            var checker = new Winton.Views.UpdateChecker();
-            await checker.AutoCheckOnStartupAsync(showNoUpdateToast: false);
+            // We'll publish this file from CI to your latest GitHub release
+            var appcastUrl =
+                "https://github.com/bradyhibbard/Wintonx/releases/latest/download/appcast.xml";
+
+            _updater = new SparkleUpdater(
+                appcastUrl,
+                // TEMP while we wire CI: allow unsigned appcast/installer
+                new Ed25519Checker(SecurityMode.Unsafe)
+            )
+            {
+                UIFactory = new UIFactory()
+            };
+
+            // Start background loop and do an initial check now
+            _updater.StartLoop(true);
         }
     }
-
 }

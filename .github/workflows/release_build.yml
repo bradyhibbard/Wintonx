@@ -1,4 +1,4 @@
-﻿name: Release on master (WPF + Inno Setup)
+﻿name: Release on master (WPF + Inno Setup + NetSparkle appcast)
 
 on:
   push:
@@ -15,6 +15,7 @@ jobs:
     env:
       WORKSPACE: ${{ github.workspace }}
       APP_NAME: Wintonx
+      # IMPORTANT: must match your actual exe name in /publish (see csproj)
       APP_EXE_NAME: Winton.exe
       PUBLISH_DIR: ${{ github.workspace }}/publish
       INSTALLER_DIR: ${{ github.workspace }}/installer_out
@@ -61,7 +62,6 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Workspace: $env:WORKSPACE"
-          Write-Host "Top-level repo contents:"
           Get-ChildItem $env:WORKSPACE
           if (-not (Test-Path "$env:PUBLISH_DIR")) { throw "Publish dir missing: $env:PUBLISH_DIR" }
           Write-Host "`nPublish tree:"
@@ -70,71 +70,90 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
 
-      - name: Debug - prove the .iss exists
-        shell: pwsh
-        run: |
-          $ws  = $env:GITHUB_WORKSPACE
-          $iss = Join-Path $ws 'installer\Wintonx.ci.iss'
-          Write-Host "Workspace: $ws"
-          Write-Host "Expecting ISS at: $iss"
-          Write-Host "`nAny .iss files in workspace:"
-          Get-ChildItem -Recurse -Force $ws -Filter *.iss | Select-Object FullName
-          if (-not (Test-Path $iss)) { throw "CI cannot see $iss" }
-
       - name: Build installer with Inno Setup
         shell: pwsh
         run: |
-            $ws      = $env:GITHUB_WORKSPACE
-            $iss     = Join-Path $ws 'installer\Wintonx.ci.iss'
-            $publish = Join-Path $ws 'publish'
-            $out     = Join-Path $ws 'installer_out'
+          $ws      = $env:GITHUB_WORKSPACE
+          $iss     = Join-Path $ws 'installer\Wintonx.ci.iss'
+          $publish = Join-Path $ws 'publish'
+          $out     = Join-Path $ws 'installer_out'
 
-            Write-Host "ISS expected at: $iss"
-            if (-not (Test-Path $iss)) { throw "Missing ISS script: $iss" }
+          Write-Host "ISS expected at: $iss"
+          if (-not (Test-Path $iss)) { throw "Missing ISS script: $iss" }
 
-            New-Item -ItemType Directory -Force -Path $out | Out-Null
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
 
-            # --- robust ISCC discovery ---
-            $candidates = @(
-                "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-                "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
-            )
-            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-            if (-not $iscc) {
-                $cmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
-                if ($cmd) { $iscc = $cmd.Source }
-            }
-            if (-not $iscc) {
-                Write-Host "Tried:" ($candidates -join " | ")
-                throw "ISCC.exe not found on runner"
-            }
-            Write-Host "Using ISCC at: $iscc"
-            # --------------------------------
+          # Robust ISCC discovery
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            $cmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
+            if ($cmd) { $iscc = $cmd.Source }
+          }
+          if (-not $iscc) {
+            Write-Host "Tried:" ($candidates -join " | ")
+            throw "ISCC.exe not found on runner"
+          }
+          Write-Host "Using ISCC at: $iscc"
 
-            Write-Host "PublishDir => $publish"
-            Write-Host "OutDir     => $out"
-            Write-Host "App EXE    => $env:APP_EXE_NAME"
+          Write-Host "PublishDir => $publish"
+          Write-Host "OutDir     => $out"
+          Write-Host "App EXE    => $env:APP_EXE_NAME"
 
-            & $iscc `
-                /DMyAppName=Wintonx `
-                /DMyAppVersion=${{ steps.getver.outputs.version }} `
-                /DMyPublishDir=$publish `
-                /DMyOutputDir=$out `
-                /DMyAppExeName=$env:APP_EXE_NAME `
-                $iss
+          & $iscc `
+            /DMyAppName=${{ env.APP_NAME }} `
+            /DMyAppVersion=${{ steps.getver.outputs.version }} `
+            /DMyPublishDir=$publish `
+            /DMyOutputDir=$out `
+            /DMyAppExeName=$env:APP_EXE_NAME `
+            $iss
 
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-            Write-Host "Installer output:"
-            Get-ChildItem -Recurse $out
+          Write-Host "Installer output:"
+          Get-ChildItem -Recurse $out
 
-      - name: Locate ISCC (debug)
+      - name: Create appcast.xml (NetSparkle)
         shell: pwsh
         run: |
-          Get-Command iscc.exe -ErrorAction SilentlyContinue | Format-List
-          Get-ChildItem 'C:\Program Files*\Inno Setup 6' -ErrorAction SilentlyContinue
+          $version = "${{ steps.getver.outputs.version }}"
+          $ws = $env:GITHUB_WORKSPACE
+          $outDir = Join-Path $ws 'installer_out'
+          if (-not (Test-Path $outDir)) { throw "Missing installer_out: $outDir" }
 
+          # Prefer a name like Wintonx-Setup-<ver>.exe, else first .exe
+          $installer = Get-ChildItem $outDir -Filter '*-Setup-*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer) { $installer = Get-ChildItem $outDir -Filter *.exe | Select-Object -First 1 }
+          if (-not $installer) { throw "Installer .exe not found in $outDir" }
 
+          $assetName = $installer.Name
+          $length = (Get-Item $installer.FullName).Length
+          $repo = "${{ github.repository }}"
+
+          $xml = @"
+            <?xml version="1.0" encoding="utf-8"?>
+            <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+              <channel>
+                <title>${{ env.APP_NAME }} Updates</title>
+                <link>https://github.com/$repo</link>
+                <description>Release feed for ${{ env.APP_NAME }}</description>
+                <item>
+                  <title>$version</title>
+                  <sparkle:releaseNotesLink>https://github.com/$repo/releases/tag/v$version</sparkle:releaseNotesLink>
+                  <enclosure url="https://github.com/$repo/releases/download/v$version/$assetName"
+                             sparkle:version="$version"
+                             length="$length"
+                             type="application/octet-stream" />
+                </item>
+              </channel>
+            </rss>
+            "@
+          $appcastPath = Join-Path $outDir 'appcast.xml'
+          $xml | Out-File -FilePath $appcastPath -Encoding utf8
+          Write-Host "Created: $appcastPath"
 
       - name: Create tag (vX.Y.Z)
         id: tag
@@ -149,12 +168,29 @@ jobs:
             git push origin $tag
           }
           "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "Tag ready: $tag"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (upload installer + appcast)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
-          files: ${{ env.INSTALLER_DIR }}/*.exe
+          files: |
+            ${{ env.INSTALLER_DIR }}/*.exe
+            ${{ env.INSTALLER_DIR }}/appcast.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # OPTIONAL: code signing example (requires cert + secret password)
+      # - name: Sign installer (optional)
+      #   if: env.CODESIGN_PFX != ''
+      #   shell: pwsh
+      #   run: |
+      #     $pfx = "$env:GITHUB_WORKSPACE\certs\codesign.pfx"
+      #     $inst = Get-ChildItem "$env:INSTALLER_DIR" -Filter *.exe | Select-Object -First 1
+      #     if ($inst) {
+      #       & "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign `
+      #         /f $pfx /p "${{ secrets.CODESIGN_PFX_PASSWORD }}" `
+      #         /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 `
+      #         $inst.FullName
+      #     }
