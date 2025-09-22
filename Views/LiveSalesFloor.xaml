@@ -15,7 +15,7 @@
 
 		<!-- Menu Bar at the Top -->
 		<DockPanel Grid.Row="0" Background="#2D2D30" Height="50">
-			<StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="5">
+			<StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="8">
 				<Button Content="Add Products" Click="AddProducts_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
 				<Button Content="Filters" Click="Filters_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
 			</StackPanel>

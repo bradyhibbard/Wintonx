@@ -10,7 +10,7 @@
 	<Grid>
 		<!-- Background -->
 		<Grid.Background>
-			<ImageBrush ImageSource="pack://application:,,,/Winton;component/Assets/Couch.jpg" 
+            <ImageBrush ImageSource="/Assets/Couch.jpg" 
                         Stretch="UniformToFill" Opacity="0.3"/>
 		</Grid.Background>
 

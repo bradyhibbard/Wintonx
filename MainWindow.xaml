@@ -4,7 +4,7 @@
         Title="Winton" Height="700" Width="1200">
 	<Grid>
 		<!-- Background image with overlay -->
-		<Image x:Name="BackgroundImage" Source="/Winton;component/Assets/Couch.jpg" Stretch="Fill"/>
+		<Image x:Name="BackgroundImage" Source="/Assets/Couch.jpg" Stretch="Fill"/>
 
 		<Border Background="#A0000000" Visibility="Visible" x:Name="StartOverlay">
 			<Button Content="Start Here" HorizontalAlignment="Center" VerticalAlignment="Center" Width="100" Height="50" Click="StartButton_Click" Foreground="White" Background="Transparent">

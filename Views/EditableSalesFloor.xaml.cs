@@ -91,6 +91,16 @@ namespace Winton.Views
             public List<UIElement> Elements { get; } = new List<UIElement>();
         }
 
+        // ---- Copy/Paste clipboard for a section button ----
+        private class SectionClipboard
+        {
+            public string ShapeType { get; init; } = "Square"; // Square|Circle|Triangle|Cross
+            public double Width { get; init; }
+            public double Height { get; init; }
+            public double Rotation { get; init; }
+        }
+        private SectionClipboard? _copyBuffer;
+
         public EditableSalesFloor()
         {
             InitializeComponent();
@@ -134,6 +144,19 @@ namespace Winton.Views
 
             Console.WriteLine("Canvas reinitialized.");
         }
+
+        private static string GetShapeTypeFromShape(Shape s)
+        {
+            return s switch
+            {
+                Rectangle => "Square",
+                Ellipse => "Circle",
+                Polygon => "Triangle",
+                Path => "Cross",
+                _ => "Square"
+            };
+        }
+
 
         private void Help_Click(object sender, RoutedEventArgs e)
         {
@@ -512,6 +535,65 @@ namespace Winton.Views
             _hasUnsavedChanges = true;
 
 
+            if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                if (_selectedShape != null)
+                {
+                    double rotation = 0;
+                    if (_selectedShape.RenderTransform is TransformGroup tg)
+                    {
+                        var rt = tg.Children.OfType<RotateTransform>().FirstOrDefault();
+                        if (rt != null) rotation = rt.Angle;
+                    }
+
+                    _copyBuffer = new SectionClipboard
+                    {
+                        ShapeType = GetShapeTypeFromShape(_selectedShape), // "Square" | "Circle" | "Triangle" | "Cross"
+                        Width = _selectedShape.Width,
+                        Height = _selectedShape.Height,
+                        Rotation = rotation
+                    };
+
+                    e.Handled = true;
+                }
+                return;
+            }
+
+            // ----- PASTE (Ctrl+V) -----
+            if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                if (_copyBuffer != null && _sectionManager != null)
+                {
+                    // Base position: near the current selection, nudged so it's visible
+                    double x = 100, y = 100;
+
+                    // If we have a selected host (button or shape), paste next to it
+                    FrameworkElement host = (_selectedShape?.Parent as FrameworkElement) ?? (FrameworkElement)_selectedShape;
+                    if (host != null)
+                    {
+                        var left = Canvas.GetLeft(host);
+                        var top = Canvas.GetTop(host);
+                        if (!double.IsNaN(left)) x = left + 20;
+                        if (!double.IsNaN(top)) y = top + 20;
+                    }
+
+                    // Create a NEW section (fresh GUID) by passing existingSectionId: null
+                    await _sectionManager.AddShapeToCanvasAsync(
+                        shapeName: _copyBuffer.ShapeType,
+                        shapeType: _copyBuffer.ShapeType,
+                        x: x, y: y,
+                        width: _copyBuffer.Width,
+                        height: _copyBuffer.Height,
+                        rotation: _copyBuffer.Rotation,
+                        existingSectionId: null,   // <-- forces new UUID in your save path
+                        wrapAsButton: true
+                    );
+
+                    _hasUnsavedChanges = true;
+                    e.Handled = true;
+                }
+                return;
+            }
 
 
             // Ctrl+Z handling
@@ -727,11 +809,11 @@ namespace Winton.Views
 
         public void Shape_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (_isDragging && _selectedShape != null)
+            if (_isDragging)
             {
                 _isDragging = false;
-                _selectedShape.ReleaseMouseCapture();
-                _selectedShape = null;
+                _selectedShape?.ReleaseMouseCapture();
+                e.Handled = true;
             }
         }
 
