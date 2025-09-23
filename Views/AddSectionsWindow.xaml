@@ -13,8 +13,7 @@
 			<Button Content="Square" Background="Transparent" Foreground="White" Click="AddSquare_Click" Margin="5" Width="200"/>
 			<Button Content="Circle" Background="Transparent" Foreground="White" Click="AddCircle_Click" Margin="5" Width="200"/>
 			<Button Content="Triangle" Background="Transparent" Foreground="White" Click="AddTriangle_Click" Margin="5" Width="200"/>
-			<Button Content="Cross" Background="Transparent" Foreground="White" Click="AddCross_Click" Margin="5" Width="200"/>
-			<Button Content="Draw Custom" Background="Transparent" Foreground="White" Click="DrawCustomSection_Click" Margin="5" Width="200"/>
+
 
 
 			<!-- Size Controls -->

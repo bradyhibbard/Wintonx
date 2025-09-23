@@ -32,15 +32,15 @@ namespace Winton.Helpers
         }
 
         public async Task AddShapeToCanvasAsync(
-      string shapeName,
-      string shapeType,
-      double x = 100,
-      double y = 100,
-      double width = 50,
-      double height = 50,
-      double rotation = 0,
-      string existingSectionId = null,
-      bool wrapAsButton = false)
+          string shapeName,
+          string shapeType,
+          double x = 100,
+          double y = 100,
+          double width = 50,
+          double height = 50,
+          double rotation = 0,
+          string existingSectionId = null,
+          bool wrapAsButton = false)
         {
 
             Shape newShape = null;
@@ -89,6 +89,7 @@ namespace Winton.Helpers
                 {
                     Children = new TransformCollection
             {
+                new TranslateTransform(),
                 new ScaleTransform(1, 1),
                 new RotateTransform(rotation, width / 2, height / 2)
             }
@@ -174,7 +175,14 @@ namespace Winton.Helpers
                 if (string.IsNullOrEmpty(existingSectionId))
                 {
                     // Save using 'shapeName' for the Name column and for the ShapeType column.
-                    await CanvasService.SaveSectionAsync(sectionId, shapeName, x, y, width, height, rotation, shapeName);
+                    double left = Canvas.GetLeft(newShape);
+                    if (double.IsNaN(left)) left = x;
+
+                    double top = Canvas.GetTop(newShape);
+                    if (double.IsNaN(top)) top = y;
+
+                    await CanvasService.SaveSectionAsync(sectionId, shapeName, left, top, width, height, rotation, shapeName);
+
                 }
                 Console.WriteLine($"Adding Shape: Name={shapeName}, ShapeType={shapeType}, X={x}, Y={y}, Width={width}, Height={height}");
 
@@ -195,7 +203,9 @@ namespace Winton.Helpers
                 },
                 Stroke = Brushes.Black,
                 StrokeThickness = 1,
-                Fill = Brushes.Transparent
+                Fill = Brushes.Transparent,
+                Width = width,
+                Height = height
             };
         }
 
