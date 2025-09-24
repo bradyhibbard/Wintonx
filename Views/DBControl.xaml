@@ -10,7 +10,14 @@
 		<!-- StackPanel to arrange buttons vertically in the upper-left corner -->
 		<StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="20,20,0,0">
 
-			<!-- Test Connection Button -->
+            <TextBlock Text="{Binding AppVersion}"
+                   Foreground="White"
+                   HorizontalAlignment="Left"
+                   Margin="20,20,50,50"
+                   FontSize="14" />
+
+
+            <!-- Test Connection Button -->
 			<Button Content="Test Connection" 
                     Width="200" 
                     Height="50" 

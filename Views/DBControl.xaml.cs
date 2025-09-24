@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Reflection;
+using System.Windows;
 using System.Windows.Controls;
 using Winton.Services;
 
@@ -9,9 +10,14 @@ namespace Winton.Views
     /// </summary>
     public partial class DBControl : UserControl
     {
+
+        public string AppVersion { get; set; }
+
         public DBControl()
         {
             InitializeComponent();
+                AppVersion = $"Current Version: {Assembly.GetEntryAssembly()?.GetName().Version}";
+                DataContext = this;
         }
 
         private async void TestConnection_Click(object sender, RoutedEventArgs e)
@@ -53,5 +59,6 @@ namespace Winton.Views
                 MessageBox.Show($"Error during update: {ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);  // Show error if any exception occurs
             }
         }
+
     }
 }
