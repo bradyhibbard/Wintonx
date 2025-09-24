@@ -12,12 +12,6 @@ using System.Windows;
 
 namespace Winton.Views
 {
-    /// <summary>
-    /// GitHub Release-based updater for WPF (.NET).
-    /// - Auto-checks on startup (throttled to once/day via %LocalAppData%\Winton\update_state.json).
-    /// - Compares against AssemblyInformationalVersion (fallback: AssemblyVersion).
-    /// - Prompts user; downloads & launches best asset (.appinstaller/.msix/.exe/.zip fallback).
-    /// </summary>
     public class UpdateChecker
     {
         private const string Owner = "bradyhibbard";

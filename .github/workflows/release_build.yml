@@ -20,7 +20,7 @@ jobs:
       WORKSPACE: ${{ github.workspace }}
       APP_NAME: Wintonx
       # Must match your built exe in /publish
-      APP_EXE_NAME: Winton.exe
+      APP_EXE_NAME: Wintonx.exe
       PUBLISH_DIR: ${{ github.workspace }}/publish
       INSTALLER_DIR: ${{ github.workspace }}/installer_out
       ISS_PATH: ${{ github.workspace }}/installer/Wintonx.ci.iss
