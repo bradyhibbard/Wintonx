@@ -255,7 +255,6 @@ namespace Winton.Views
 
                         await CanvasService.UpdateSectionDimensionsAsync(sectionId, x, y, newWidth, newHeight, rotation);
 
-                        MessageBox.Show("Section updated successfully!");
                     }
                     else
                     {

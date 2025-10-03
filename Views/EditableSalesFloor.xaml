@@ -51,8 +51,20 @@
 		<!-- Canvas for Designing Sales Floor, Wrapped in a ViewBox for Uniform Scaling -->
 		<Viewbox Grid.Row="1" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
 			<!-- Set your design canvas size (e.g. 1200 x 500) -->
-			<Canvas x:Name="SalesFloorCanvas" Background="LightGray" Width="1200" Height="500" MouseLeftButtonDown="SalesFloorCanvas_MouseLeftButtonDown"/>
-		</Viewbox>
+            <Canvas x:Name="SalesFloorCanvas"
+            Background="LightGray"
+            Width="1200" Height="500"
+            MouseLeftButtonDown="SalesFloorCanvas_MouseLeftButtonDown">
+
+                <!-- Right-click context menu -->
+                <Canvas.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy" Click="CopyMenuItem_Click"/>
+                        <MenuItem Header="Paste" Click="PasteMenuItem_Click"/>
+                    </ContextMenu>
+                </Canvas.ContextMenu>
+            </Canvas>
+        </Viewbox>
 
 		<!-- Sidebar Panel for Sections (remains fixed if desired) -->
 		<Border x:Name="SectionsPanel" Background="#333" Width="200" Height="300"

@@ -32,59 +32,124 @@ namespace Winton.Helpers
         }
 
         public async Task AddShapeToCanvasAsync(
-          string shapeName,
-          string shapeType,
-          double x = 100,
-          double y = 100,
-          double width = 50,
-          double height = 50,
-          double rotation = 0,
-          string existingSectionId = null,
-          bool wrapAsButton = false)
+            string shapeName,
+            string shapeType,
+            double x = 100,
+            double y = 100,
+            double width = 50,
+            double height = 50,
+            double rotation = 0,
+            string existingSectionId = null,
+            bool wrapAsButton = false)
         {
-
-            Shape newShape = null;
-
-            // Use shapeName to determine which shape to create.
-            switch (shapeType.ToLower())
+            // 1) Build the shape by type
+            Shape newShape = shapeType.ToLower() switch
             {
-                case "square":
-                    newShape = new Rectangle
+                "square" => new Rectangle { Width = width, Height = height, Stroke = Brushes.Black, StrokeThickness = 1, Fill = Brushes.Transparent },
+                "circle" => new Ellipse { Width = width, Height = height, Stroke = Brushes.Black, StrokeThickness = 1, Fill = Brushes.Transparent },
+                "triangle" => CreateTriangle(width, height),
+                "cross" => CreateCross(width, height),
+                _ => null
+            };
+            if (newShape == null) return;
+
+            // 2) Base position (will apply to the *host* we add)
+            Canvas.SetLeft(newShape, x);
+            Canvas.SetTop(newShape, y);
+
+            // 3) Compute SectionID
+            string sectionId = string.IsNullOrEmpty(existingSectionId) ? Guid.NewGuid().ToString() : existingSectionId;
+
+            // The element we actually add to the canvas (used for saving coords)
+            FrameworkElement hostElement;
+
+            if (wrapAsButton)
+            {
+                // Button (host) carries the GUID and the rotation so your save logic reads it correctly
+                var sectionButton = new Button
+                {
+                    Content = newShape,
+                    Tag = sectionId,
+                    Background = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Padding = new Thickness(0),
+                    Width = width,
+                    Height = height,
+                    RenderTransform = new TransformGroup
                     {
-                        Width = width,
-                        Height = height,
-                        Stroke = Brushes.Black,
-                        StrokeThickness = 1,
-                        Fill = Brushes.Transparent
-                    };
-                    break;
-                case "circle":
-                    newShape = new Ellipse
-                    {
-                        Width = width,
-                        Height = height,
-                        Stroke = Brushes.Black,
-                        StrokeThickness = 1,
-                        Fill = Brushes.Transparent
-                    };
-                    break;
-                case "triangle":
-                    newShape = CreateTriangle(width, height);
-                    break;
-                case "cross":
-                    newShape = CreateCross(width, height);
-                    break;
-                    // Optionally, handle "Custom" or other shape types here.
+                        Children = new TransformCollection
+                {
+                    new TranslateTransform(),
+                    new ScaleTransform(1, 1),
+                    new RotateTransform(rotation, width / 2, height / 2)
+                }
+                    }
+                };
+
+                // Inner shape is marked for your selection/drag checks in EditableSalesFloor
+                newShape.Tag = "SectionButton";
+
+                // Clip by shape name
+                if (shapeName == "Circle")
+                {
+                    sectionButton.Clip = new EllipseGeometry(new Point(width / 2, height / 2), width / 2, height / 2);
+                }
+                else if (shapeName == "Triangle")
+                {
+                    var figure = new PathFigure { StartPoint = new Point(width / 2, 0) };
+                    figure.Segments.Add(new LineSegment(new Point(width, height), true));
+                    figure.Segments.Add(new LineSegment(new Point(0, height), true));
+                    figure.IsClosed = true;
+                    var geometry = new PathGeometry();
+                    geometry.Figures.Add(figure);
+                    sectionButton.Clip = geometry;
+                }
+                else
+                {
+                    sectionButton.Clip = new RectangleGeometry(new Rect(0, 0, width, height));
+                }
+
+                // IMPORTANT: use SectionManager's handlers so the *button* moves immediately after paste
+                // Fire even if the Button consumes the event
+                sectionButton.AddHandler(
+                    UIElement.MouseLeftButtonDownEvent,
+                    new MouseButtonEventHandler(Element_MouseLeftButtonDown),
+                    /*handledEventsToo:*/ true);
+
+                sectionButton.AddHandler(
+                    UIElement.MouseMoveEvent,
+                    new MouseEventHandler(Element_MouseMove),
+                    /*handledEventsToo:*/ true);
+
+                sectionButton.AddHandler(
+                    UIElement.MouseLeftButtonUpEvent,
+                    new MouseButtonEventHandler(Element_MouseLeftButtonUp),
+                    /*handledEventsToo:*/ true);
+
+                sectionButton.MouseWheel += Element_MouseWheel;
+                sectionButton.MouseRightButtonDown += Element_RightClick;
+
+                // Bubble selection event
+                sectionButton.Click += (s, e) => { SectionSelected?.Invoke(sectionId); };
+
+                // Add to canvas as host
+                _canvas.Children.Add(sectionButton);
+                Canvas.SetLeft(sectionButton, x);
+                Canvas.SetTop(sectionButton, y);
+
+                // Optional: auto-select the new button for instant drag/visual feedback
+                if (_parentControl is EditableSalesFloor ef)
+                {
+                    ef.SelectElementForContext(sectionButton);
+                    sectionButton.Focus();
+                }
+
+                hostElement = sectionButton;
             }
-
-            if (newShape != null)
+            else
             {
-                // Set position on the canvas.
-                newShape.Tag = "SectionShape"; // Tag for identification
-                Canvas.SetLeft(newShape, x);
-                Canvas.SetTop(newShape, y);
-
-                // Create a TransformGroup with a ScaleTransform and a RotateTransform.
+                // Raw shape carries GUID and its own rotation (as before)
+                newShape.Tag = sectionId;
                 newShape.RenderTransform = new TransformGroup
                 {
                     Children = new TransformCollection
@@ -95,99 +160,41 @@ namespace Winton.Helpers
             }
                 };
 
-                // Generate or reuse the SectionID.
-                string sectionId = string.IsNullOrEmpty(existingSectionId)
-                    ? Guid.NewGuid().ToString()
-                    : existingSectionId;
+                newShape.MouseLeftButtonDown += Element_MouseLeftButtonDown;
+                newShape.MouseMove += Element_MouseMove;
+                newShape.MouseLeftButtonUp += Element_MouseLeftButtonUp;
+                newShape.MouseWheel += Element_MouseWheel;
+                newShape.MouseRightButtonDown += Element_RightClick;
 
-                newShape.Tag = sectionId;
-
-                if (wrapAsButton)
-                {
-                    // Wrap the shape in a Button.
-                    Button sectionButton = new Button
-                    {
-                        Content = newShape,
-                        Tag = sectionId,
-                        Background = Brushes.Transparent,
-                        BorderThickness = new Thickness(0),
-                        Padding = new Thickness(0),
-                        Width = width,
-                        Height = height
-                    };
-
-                    // Apply clipping based on the shape.
-                    if (shapeName == "Circle")
-                    {
-                        sectionButton.Clip = new EllipseGeometry(new Point(width / 2, height / 2), width / 2, height / 2);
-                    }
-                    else if (shapeName == "Triangle")
-                    {
-                        var figure = new System.Windows.Media.PathFigure { StartPoint = new Point(width / 2, 0) };
-                        figure.Segments.Add(new LineSegment(new Point(width, height), true));
-                        figure.Segments.Add(new LineSegment(new Point(0, height), true));
-                        figure.IsClosed = true;
-                        var geometry = new System.Windows.Media.PathGeometry();
-                        geometry.Figures.Add(figure);
-                        sectionButton.Clip = geometry;
-                    }
-                    else // default: square/rectangle
-                    {
-                        sectionButton.Clip = new RectangleGeometry(new Rect(0, 0, width, height));
-                    }
-
-                    // Attach unified event handlers to the Button.
-                    // Attach the *EditableSalesFloor* event handlers instead of SectionManager handlers.
-                    if (Application.Current.MainWindow?.Content is EditableSalesFloor editableSalesFloor)
-                    {
-                        sectionButton.MouseLeftButtonDown += editableSalesFloor.Shape_MouseLeftButtonDown;
-                        sectionButton.MouseMove += editableSalesFloor.Shape_MouseMove;
-                        sectionButton.MouseLeftButtonUp += editableSalesFloor.Shape_MouseLeftButtonUp;
-                    }
-
-                    // Set important Tag for selection/deletion logic
-                    sectionButton.Tag = "SectionButton";
-
-
-                    // Raise the SectionSelected event when the button is clicked.
-                    sectionButton.Click += (s, e) =>
-                    {
-                        SectionSelected?.Invoke(sectionId);
-                    };
-
-                    _canvas.Children.Add(sectionButton);
-                    Canvas.SetLeft(sectionButton, x);
-                    Canvas.SetTop(sectionButton, y);
-                }
-                else
-                {
-                    // Attach unified event handlers to the raw shape.
-                    newShape.MouseLeftButtonDown += Element_MouseLeftButtonDown;
-                    newShape.MouseMove += Element_MouseMove;
-                    newShape.MouseLeftButtonUp += Element_MouseLeftButtonUp;
-                    newShape.MouseWheel += Element_MouseWheel;
-                    newShape.MouseRightButtonDown += Element_RightClick;
-
-                    _canvas.Children.Add(newShape);
-                }
-
-                // Only save to the database if this is a new section.
-                if (string.IsNullOrEmpty(existingSectionId))
-                {
-                    // Save using 'shapeName' for the Name column and for the ShapeType column.
-                    double left = Canvas.GetLeft(newShape);
-                    if (double.IsNaN(left)) left = x;
-
-                    double top = Canvas.GetTop(newShape);
-                    if (double.IsNaN(top)) top = y;
-
-                    await CanvasService.SaveSectionAsync(sectionId, shapeName, left, top, width, height, rotation, shapeName);
-
-                }
-                Console.WriteLine($"Adding Shape: Name={shapeName}, ShapeType={shapeType}, X={x}, Y={y}, Width={width}, Height={height}");
-
+                _canvas.Children.Add(newShape);
+                hostElement = newShape;
             }
+
+            // 4) Persist only if creating a new section
+            if (string.IsNullOrEmpty(existingSectionId))
+            {
+                double left = Canvas.GetLeft(hostElement);
+                if (double.IsNaN(left)) left = x;
+
+                double top = Canvas.GetTop(hostElement);
+                if (double.IsNaN(top)) top = y;
+
+                await CanvasService.SaveSectionAsync(
+                    sectionId: sectionId,
+                    name: shapeName,
+                    x: left,
+                    y: top,
+                    width: width,
+                    height: height,
+                    rotation: rotation,
+                    shapeType: shapeName
+                );
+            }
+
+            Console.WriteLine($"Adding Shape: Name={shapeName}, ShapeType={shapeType}, X={x}, Y={y}, Width={width}, Height={height}");
         }
+
+
 
 
 
@@ -389,13 +396,59 @@ namespace Winton.Helpers
             _selectedElement = sender as FrameworkElement;
             if (_selectedElement != null && e.RightButton == MouseButtonState.Pressed)
             {
-                ContextMenu contextMenu = new ContextMenu();
-                MenuItem deleteItem = new MenuItem { Header = "Delete Shape" };
+                var contextMenu = new ContextMenu();
+
+                var ef = _parentControl as EditableSalesFloor;
+                ef?.SelectElementForContext(_selectedElement);
+
+                // COPY
+                var copyItem = new MenuItem { Header = "Copy", InputGestureText = "Ctrl+C" };
+                copyItem.Click += (s2, a2) => ef?.CopySelectedSection();
+
+                // PASTE (enabled dynamically)
+                var pasteItem = new MenuItem { Header = "Paste", InputGestureText = "Ctrl+V" };
+                pasteItem.Click += async (s2, a2) =>
+                {
+                    if (ef == null) return;
+                    if (!ef.CanPasteSection)
+                    {
+                        MessageBox.Show("Copy a section first.");
+                        return;
+                    }
+                    await ef.PasteCopiedSectionAsync();
+                };
+
+                // OPTIONAL: Duplicate (single click does Copy then Paste)
+                var duplicateItem = new MenuItem { Header = "Duplicate" };
+                duplicateItem.Click += async (s2, a2) =>
+                {
+                    if (ef == null) return;
+                    ef.CopySelectedSection();
+                    if (ef.CanPasteSection)
+                        await ef.PasteCopiedSectionAsync();
+                };
+
+                contextMenu.Items.Add(copyItem);
+                contextMenu.Items.Add(pasteItem);
+                contextMenu.Items.Add(duplicateItem); // optional
+
+                // Enable/disable Paste dynamically when the menu opens
+                contextMenu.Opened += (s2, a2) =>
+                {
+                    if (ef != null) pasteItem.IsEnabled = ef.CanPasteSection;
+                };
+
+                // --- existing Delete item ---
+                var deleteItem = new MenuItem { Header = "Delete Shape" };
                 deleteItem.Click += async (s, args) =>
                 {
                     if (_selectedElement == null) return;
 
-                    string sectionId = _selectedElement.Tag as string;
+                    // Prefer Button.Tag (GUID) when wrapped; fallback to Shape.Tag when raw
+                    var sectionId =
+                        (_selectedElement as Button)?.Tag as string ??
+                        (_selectedElement as Shape)?.Tag as string;
+
                     if (string.IsNullOrEmpty(sectionId)) return;
 
                     var result = MessageBox.Show(
@@ -408,13 +461,9 @@ namespace Winton.Helpers
                     {
                         try
                         {
-                            // 🛠 Move products to Archive and delete Section
                             await ProductPlacementServices.ArchiveAndDeleteSectionAsync(sectionId);
-
-                            // 🛠 Remove visual from canvas
                             _canvas.Children.Remove(_selectedElement);
                             _selectedElement = null;
-
                             MessageBox.Show("Section deleted and products archived successfully.");
                         }
                         catch (Exception ex)
@@ -425,10 +474,13 @@ namespace Winton.Helpers
                 };
 
                 contextMenu.Items.Add(deleteItem);
+
                 _selectedElement.ContextMenu = contextMenu;
                 contextMenu.IsOpen = true;
+                e.Handled = true;
             }
         }
+
 
         public void ClearSelection()
         {

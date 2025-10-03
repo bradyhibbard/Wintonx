@@ -2,8 +2,20 @@
 {
     public class Section
     {
-        public string SectionID { get; set; }    // Unique identifier for each section of the sales floor.
-        public string Name { get; set; }         // Human-readable name for the section.
-    }
+        public string SectionID { get; set; }
+        public string Name { get; set; }
 
+
+        /// <summary>
+        /// Creates a clone of this section with a new SectionID.
+        /// </summary>
+        public Section Clone()
+        {
+            return new Section
+            {
+                SectionID = Guid.NewGuid().ToString(),
+                Name = this.Name            
+            };
+        }
+    }
 }

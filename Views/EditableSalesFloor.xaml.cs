@@ -31,7 +31,7 @@ namespace Winton.Views
         private bool _hasUnsavedChanges = false;
         public bool _isMoveSave = false;
         private bool _isClearingCanvas = false;
-
+        private Section _copiedSection;
 
 
 
@@ -157,6 +157,49 @@ namespace Winton.Views
             };
         }
 
+        // Step 1: public wrappers to expose existing copy/paste logic
+
+        public void CopySelectedSection()
+        {
+            CopySelectedShape();
+            Console.WriteLine("[Copy] buffer set? " + (_copyBuffer != null));
+        }
+        public async Task PasteCopiedSectionAsync()
+        {
+            Console.WriteLine("[Paste] can paste? " + (_copyBuffer != null));
+            await PasteCopiedShapeAsync();
+            Console.WriteLine("[Paste] requested AddShapeToCanvasAsync()");
+        }
+
+
+        // Optional convenience for UI to enable/disable "Paste"
+        public bool CanPasteSection => _copyBuffer != null;
+
+        // Select an element (shape or button-wrapped shape) from a context-click
+        public void SelectElementForContext(FrameworkElement element)
+        {
+            // If it’s a Button wrapping a Shape, unwrap it
+            if (element is Button btn && btn.Content is Shape wrapped) element = wrapped;
+
+            var shape = element as Shape;
+            if (shape == null) return;
+
+            // Remove highlight from previous selection
+            if (_selectedShape != null)
+            {
+                _selectedShape.Stroke = Brushes.Black;
+                _selectedShape.StrokeThickness = 2;
+            }
+
+            // Set & highlight new selection
+            _selectedShape = shape;
+            _selectedShape.Stroke = Brushes.DeepSkyBlue;
+            _selectedShape.StrokeThickness = 3;
+
+            // Ensure we’re not starting a drag from a right-click
+            _isDragging = false;
+        }
+
 
         private void Help_Click(object sender, RoutedEventArgs e)
         {
@@ -168,6 +211,67 @@ namespace Winton.Views
             helpWindow.ShowDialog();
         }
 
+        private void CopySelectedShape()
+        {
+            if (_selectedShape != null)
+            {
+                double rotation = 0;
+                if (_selectedShape.RenderTransform is TransformGroup tg)
+                {
+                    var rt = tg.Children.OfType<RotateTransform>().FirstOrDefault();
+                    if (rt != null) rotation = rt.Angle;
+                }
+
+                _copyBuffer = new SectionClipboard
+                {
+                    ShapeType = GetShapeTypeFromShape(_selectedShape),
+                    Width = _selectedShape.Width,
+                    Height = _selectedShape.Height,
+                    Rotation = rotation
+                };
+            }
+        }
+
+        private async Task PasteCopiedShapeAsync()
+        {
+            if (_copyBuffer != null && _sectionManager != null)
+            {
+                double x = 100, y = 100;
+
+                FrameworkElement host = (_selectedShape?.Parent as FrameworkElement) ?? (FrameworkElement)_selectedShape;
+                if (host != null)
+                {
+                    var left = Canvas.GetLeft(host);
+                    var top = Canvas.GetTop(host);
+                    if (!double.IsNaN(left)) x = left + 20;
+                    if (!double.IsNaN(top)) y = top + 20;
+                }
+
+                await _sectionManager.AddShapeToCanvasAsync(
+                    shapeName: _copyBuffer.ShapeType,
+                    shapeType: _copyBuffer.ShapeType,
+                    x: x, y: y,
+                    width: _copyBuffer.Width,
+                    height: _copyBuffer.Height,
+                    rotation: _copyBuffer.Rotation,
+                    existingSectionId: null, // ensures new UUID
+                    wrapAsButton: true
+                );
+
+                _hasUnsavedChanges = true;
+            }
+        }
+
+
+        private void CopyMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            CopySelectedShape();
+        }
+
+        private async void PasteMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            await PasteCopiedShapeAsync();
+        }
 
         #region Context Menu Setup
 
@@ -534,69 +638,23 @@ namespace Winton.Views
             if (!_isEditMode) return;
             _hasUnsavedChanges = true;
 
-
+            // ----- COPY (Ctrl+C) -----
             if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
-                if (_selectedShape != null)
-                {
-                    double rotation = 0;
-                    if (_selectedShape.RenderTransform is TransformGroup tg)
-                    {
-                        var rt = tg.Children.OfType<RotateTransform>().FirstOrDefault();
-                        if (rt != null) rotation = rt.Angle;
-                    }
-
-                    _copyBuffer = new SectionClipboard
-                    {
-                        ShapeType = GetShapeTypeFromShape(_selectedShape), // "Square" | "Circle" | "Triangle" | "Cross"
-                        Width = _selectedShape.Width,
-                        Height = _selectedShape.Height,
-                        Rotation = rotation
-                    };
-
-                    e.Handled = true;
-                }
+                CopySelectedShape();   // 🔹 Call helper instead of inline logic
+                e.Handled = true;
                 return;
             }
 
             // ----- PASTE (Ctrl+V) -----
             if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
-                if (_copyBuffer != null && _sectionManager != null)
-                {
-                    // Base position: near the current selection, nudged so it's visible
-                    double x = 100, y = 100;
-
-                    // If we have a selected host (button or shape), paste next to it
-                    FrameworkElement host = (_selectedShape?.Parent as FrameworkElement) ?? (FrameworkElement)_selectedShape;
-                    if (host != null)
-                    {
-                        var left = Canvas.GetLeft(host);
-                        var top = Canvas.GetTop(host);
-                        if (!double.IsNaN(left)) x = left + 20;
-                        if (!double.IsNaN(top)) y = top + 20;
-                    }
-
-                    // Create a NEW section (fresh GUID) by passing existingSectionId: null
-                    await _sectionManager.AddShapeToCanvasAsync(
-                        shapeName: _copyBuffer.ShapeType,
-                        shapeType: _copyBuffer.ShapeType,
-                        x: x, y: y,
-                        width: _copyBuffer.Width,
-                        height: _copyBuffer.Height,
-                        rotation: _copyBuffer.Rotation,
-                        existingSectionId: null,   // <-- forces new UUID in your save path
-                        wrapAsButton: true
-                    );
-
-                    _hasUnsavedChanges = true;
-                    e.Handled = true;
-                }
+                await PasteCopiedShapeAsync();  // 🔹 Call helper
+                e.Handled = true;
                 return;
             }
 
-
-            // Ctrl+Z handling
+            // ----- UNDO (Ctrl+Z) -----
             if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
             {
                 // 1) Partial undo if actively drawing perimeter
@@ -614,12 +672,16 @@ namespace Winton.Views
                 {
                     UndoLastFinalizedShape();
                 }
+                e.Handled = true;
+                return;
             }
-            else if (e.Key == Key.Delete && _selectedShape != null)
+
+            // ----- DELETE (Delete key) -----
+            if (e.Key == Key.Delete && _selectedShape != null)
             {
                 // Remove from Canvas
                 SalesFloorCanvas.Children.Remove(_selectedShape);
-                _hasUnsavedChanges = true; // Ensure changes get saved
+                _hasUnsavedChanges = true;
 
                 if (_selectedShape.Tag?.ToString() == "Partition")
                 {
@@ -627,16 +689,13 @@ namespace Winton.Views
 
                     if (removedPartition != null)
                     {
-                        // Remove from memory (if not already done)
                         _partitions.Remove(removedPartition);
 
                         if (!string.IsNullOrEmpty(removedPartition.Id))
                         {
-                            // Track for safety so SavePartitionsAsync won't resurrect it
                             if (!_deletedPartitionIds.Contains(removedPartition.Id))
                                 _deletedPartitionIds.Add(removedPartition.Id);
 
-                            // Also delete immediately from DB
                             await CanvasService.DeletePartitionAsync(removedPartition.Id);
                             Console.WriteLine($"Partition {removedPartition.Id} deleted via Delete key.");
                         }
@@ -648,10 +707,11 @@ namespace Winton.Views
                 }
 
                 _selectedShape = null;
+                e.Handled = true;
+                return;
             }
-
-
         }
+
 
 
         private async void EditableSalesFloor_PreviewKeyUp(object sender, KeyEventArgs e)
