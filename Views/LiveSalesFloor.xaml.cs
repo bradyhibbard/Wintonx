@@ -230,6 +230,8 @@ namespace Winton.Views
                 .ToList();
 
             UpdateFilteredProductsList(filteredProducts);
+
+            _ = HighlightForFilteredProductsAsync(filteredProducts);
         }
         private void UpdateFilteredProductsList(List<Product> products)
         {
@@ -462,6 +464,119 @@ namespace Winton.Views
             var archiveWindow = new SectionArchiveWindow(_currentSectionId);
             archiveWindow.Show();
         }
+
+        //Highlighting the Filtered Products
+
+        private void ClearHighlights()
+        {
+            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+            {
+                btn.Opacity = 1.0;
+
+                // If Button wraps a Shape, reset stroke
+                if (btn.Content is Shape shape)
+                {
+                    shape.Stroke = Brushes.Black;
+                    shape.StrokeThickness = 2;
+                }
+            }
+        }
+
+        private void HighlightSections(HashSet<string> matchingSectionIds)
+        {
+            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+            {
+                var sectionId = btn.Tag as string;
+
+                if (!string.IsNullOrEmpty(sectionId) && matchingSectionIds.Contains(sectionId))
+                {
+                    // MATCH: brighten + bold stroke
+                    btn.Opacity = 1.0;
+                    if (btn.Content is Shape shape)
+                    {
+                        shape.Stroke = Brushes.DeepSkyBlue;
+                        shape.StrokeThickness = 3;
+                    }
+                }
+                else
+                {
+                    // NON-MATCH: dim + reset stroke
+                    btn.Opacity = 0.3;
+                    if (btn.Content is Shape shape)
+                    {
+                        shape.Stroke = Brushes.Black;
+                        shape.StrokeThickness = 2;
+                    }
+                }
+            }
+        }
+
+        private void DimAllSections_NoResults()
+        {
+            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+            {
+                btn.Opacity = 0.3;
+                if (btn.Content is Shape shape)
+                {
+                    shape.Stroke = Brushes.Black;
+                    shape.StrokeThickness = 2;
+                }
+            }
+        }
+
+        private async Task HighlightForFilteredProductsAsync(List<Product> filteredProducts)
+        {
+            // Determine if there are any active filter inputs
+            var vendorInput = VendorTextBox.Text?.Trim();
+            var categoryInput = CategoryTextBox.Text?.Trim();
+            var groupInput = GroupTextBox.Text?.Trim();
+            var productInput = ProductTextBox.Text?.Trim();
+
+            bool anyInput = !(string.IsNullOrEmpty(vendorInput) &&
+                              string.IsNullOrEmpty(categoryInput) &&
+                              string.IsNullOrEmpty(groupInput) &&
+                              string.IsNullOrEmpty(productInput));
+
+            // If no inputs, clear highlights entirely
+            if (!anyInput)
+            {
+                ClearHighlights();
+                return;
+            }
+
+            // We have some filter — use ANY-match of fields (your preference)
+            // If no filtered products, dim all sections (your preference)
+            if (filteredProducts == null || filteredProducts.Count == 0)
+            {
+                DimAllSections_NoResults();
+                return;
+            }
+
+            // Get distinct item numbers from the filtered results
+            var itemNumbers = filteredProducts
+                .Select(p => p.ItemNumber)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (itemNumbers.Count == 0)
+            {
+                DimAllSections_NoResults();
+                return;
+            }
+
+            // Query DB for which sections currently host these item numbers (active placements only)
+            var matchingSectionIds = await ProductPlacementServices.GetSectionIdsForItemNumbersAsync(itemNumbers);
+
+            if (matchingSectionIds == null || matchingSectionIds.Count == 0)
+            {
+                DimAllSections_NoResults();
+                return;
+            }
+
+            HighlightSections(matchingSectionIds);
+        }
+
 
 
     }

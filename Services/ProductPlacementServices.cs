@@ -610,6 +610,62 @@ namespace Winton.Services
         }
 
 
+        internal static async Task<HashSet<string>> GetSectionIdsForItemNumbersAsync(IEnumerable<string> itemNumbers)
+        {
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var list = itemNumbers?
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (list == null || list.Count == 0)
+                return ids;
+
+            // Build a parameterized IN clause: @p0, @p1, ...
+            var paramNames = list.Select((_, i) => $"@p{i}").ToList();
+
+            var sql = $@"
+        SELECT DISTINCT SectionID
+        FROM ProductPlacements
+        WHERE DateRemoved IS NULL
+          AND ItemNumber IN ({string.Join(",", paramNames)})
+    ";
+
+            // Use the same DB path pattern as DatabaseService
+            var dbPathField = typeof(DatabaseService)
+                .GetField("dbPath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+            if (dbPathField == null)
+                return ids;
+
+            var dbPath = (string)dbPathField.GetValue(null);
+
+            using (var connection = new SqliteConnection($"Data Source={dbPath};"))
+            {
+                await connection.OpenAsync();
+                using (var cmd = new SqliteCommand(sql, connection))
+                {
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        cmd.Parameters.AddWithValue(paramNames[i], list[i]);
+                    }
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var sectionId = reader["SectionID"]?.ToString();
+                            if (!string.IsNullOrEmpty(sectionId))
+                                ids.Add(sectionId);
+                        }
+                    }
+                }
+            }
+
+            return ids;
+        }
+
 
 
 
