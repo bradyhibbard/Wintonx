@@ -273,5 +273,91 @@ namespace Winton.Services
             return reportDetails;
         }
 
+        /// <summary>
+        /// Retrieves total revenue for a given section within a date range.
+        /// Returns 0 if no sales are found.
+        /// </summary>
+        public static async Task<decimal> GetRevenueBySectionAsync(string sectionId, DateTime startDate, DateTime endDate)
+        {
+            decimal totalRevenue = 0;
+
+            using (var connection = new SqliteConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
+
+                string query = @"
+            SELECT IFNULL(SUM(Revenue), 0)
+            FROM ProductPlacements
+            WHERE SectionID = @SectionID
+              AND DatePlaced BETWEEN @StartDate AND @EndDate
+              AND DateRemoved IS NULL;";
+
+                using (var command = new SqliteCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@SectionID", sectionId);
+                    command.Parameters.AddWithValue("@StartDate", startDate);
+                    command.Parameters.AddWithValue("@EndDate", endDate);
+
+                    var result = await command.ExecuteScalarAsync();
+                    if (result != DBNull.Value && result != null)
+                        totalRevenue = Convert.ToDecimal(result);
+                }
+            }
+
+            return totalRevenue;
+        }
+
+        /// <summary>
+        /// Retrieves revenue grouped by SectionID between two dates.
+        /// Joins SalesData → ProductPlacements because SalesData has no SectionID.
+        /// </summary>
+        public static async Task<Dictionary<string, decimal>> GetRevenueDataAsync(DateTime startDate, DateTime endDate)
+        {
+            var results = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+            using (var connection = new SqliteConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
+
+                string query = @"
+            SELECT 
+                pp.SectionID,
+                IFNULL(SUM(sd.Revenue), 0) AS TotalRevenue
+            FROM SalesData sd
+            INNER JOIN ProductPlacements pp 
+                ON sd.ItemNumber = pp.ItemNumber
+            WHERE sd.SaleDate BETWEEN @StartDate AND @EndDate
+              AND pp.DateRemoved IS NULL
+            GROUP BY pp.SectionID;
+        ";
+
+                using (var command = new SqliteCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@StartDate", startDate);
+                    command.Parameters.AddWithValue("@EndDate", endDate);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string sectionId = reader["SectionID"]?.ToString();
+                            decimal revenue = reader["TotalRevenue"] != DBNull.Value
+                                ? Convert.ToDecimal(reader["TotalRevenue"])
+                                : 0m;
+
+                            if (!string.IsNullOrWhiteSpace(sectionId))
+                                results[sectionId] = revenue;
+                        }
+                    }
+                }
+            }
+
+            return results;
+        }
+
+
+
+
     }
+
 }

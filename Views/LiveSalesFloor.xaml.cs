@@ -1,15 +1,18 @@
-﻿using System;
+﻿using NPOI.SS.UserModel.Charts;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using Winton.Helpers;
 using Winton.Models;
 using Winton.Services;
+using Winton.ViewModels;
 
 namespace Winton.Views
 {
@@ -526,7 +529,9 @@ namespace Winton.Views
 
         private async Task HighlightForFilteredProductsAsync(List<Product> filteredProducts)
         {
-            // Determine if there are any active filter inputs
+            // Debug log to confirm this method is running
+            Console.WriteLine("HighlightForFilteredProductsAsync triggered");
+
             var vendorInput = VendorTextBox.Text?.Trim();
             var categoryInput = CategoryTextBox.Text?.Trim();
             var groupInput = GroupTextBox.Text?.Trim();
@@ -537,22 +542,20 @@ namespace Winton.Views
                               string.IsNullOrEmpty(groupInput) &&
                               string.IsNullOrEmpty(productInput));
 
-            // If no inputs, clear highlights entirely
             if (!anyInput)
             {
                 ClearHighlights();
+                RevenueOverlayCanvas.Children.Clear();
                 return;
             }
 
-            // We have some filter — use ANY-match of fields (your preference)
-            // If no filtered products, dim all sections (your preference)
             if (filteredProducts == null || filteredProducts.Count == 0)
             {
                 DimAllSections_NoResults();
+                RevenueOverlayCanvas.Children.Clear();
                 return;
             }
 
-            // Get distinct item numbers from the filtered results
             var itemNumbers = filteredProducts
                 .Select(p => p.ItemNumber)
                 .Where(s => !string.IsNullOrWhiteSpace(s))
@@ -562,22 +565,171 @@ namespace Winton.Views
             if (itemNumbers.Count == 0)
             {
                 DimAllSections_NoResults();
+                RevenueOverlayCanvas.Children.Clear();
                 return;
             }
 
-            // Query DB for which sections currently host these item numbers (active placements only)
+            // Fetch matching sections from DB
             var matchingSectionIds = await ProductPlacementServices.GetSectionIdsForItemNumbersAsync(itemNumbers);
+            Console.WriteLine($"Found {matchingSectionIds?.Count ?? 0} matching sections");
 
             if (matchingSectionIds == null || matchingSectionIds.Count == 0)
             {
                 DimAllSections_NoResults();
+                RevenueOverlayCanvas.Children.Clear();
                 return;
             }
 
+            // Highlight the matching sections visually
             HighlightSections(matchingSectionIds);
+            RevenueOverlayCanvas.Children.Clear();
+
+            // Loop through each matching section and add a floating revenue box
+            foreach (var sectionId in matchingSectionIds)
+            {
+                if (string.IsNullOrWhiteSpace(sectionId))
+                {
+                    Console.WriteLine("⚠️ Skipping null or empty sectionId");
+                    continue;
+                }
+
+                try
+                {
+                    DateTime startDate = DateTime.Now.AddMonths(-1);
+                    DateTime endDate = DateTime.Now;
+                    decimal revenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, startDate, endDate);
+
+                    Console.WriteLine($"✅ Revenue for section {sectionId}: {revenue:C0}");
+
+                    // Create the floating revenue box
+                    var border = new Border
+                    {
+                        Background = new SolidColorBrush(Color.FromArgb(220, 45, 45, 48)),
+                        CornerRadius = new CornerRadius(5),
+                        BorderBrush = Brushes.White,
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(6),
+                        Tag = sectionId,
+                        Cursor = Cursors.Hand,
+                        Child = new TextBlock
+                        {
+                            Text = $"Revenue: {revenue:C0}",
+                            Foreground = Brushes.White,
+                            FontSize = 12,
+                            FontWeight = FontWeights.SemiBold
+                        }
+                    };
+
+                    border.MouseLeftButtonUp += RevenueLabel_Click;
+
+                    // Try to locate the section shape on the canvas
+                    var section = LiveFloorCanvas.Children
+                        .OfType<FrameworkElement>()
+                        .FirstOrDefault(el => el.Tag != null && el.Tag.ToString() == sectionId);
+
+                    if (section == null)
+                    {
+                        Console.WriteLine($"❌ No UI element found for sectionId: {sectionId}");
+                        continue;
+                    }
+
+                    // Convert coordinates from Viewbox-scaled canvas to overlay coordinates
+                    Point relativeToCanvas = section.TranslatePoint(new Point(0, 0), LiveFloorCanvas);
+                    Point screenPoint = LiveFloorCanvas.TranslatePoint(relativeToCanvas, RevenueOverlayCanvas);
+
+                    double labelX = screenPoint.X + (section.RenderSize.Width / 2) - 40;
+                    double labelY = screenPoint.Y - 30;
+
+                    Canvas.SetLeft(border, labelX);
+                    Canvas.SetTop(border, labelY);
+                    RevenueOverlayCanvas.Children.Add(border);
+
+                    Console.WriteLine($"✅ Added overlay for {sectionId} at ({labelX}, {labelY})");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 Error adding overlay for sectionId {sectionId}: {ex.Message}");
+                }
+            }
         }
 
+        private async void RevenueLabel_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not Border border || border.Tag is not string sectionId)
+                return;
 
+            try
+            {
+                // --- Load section and date info ---
+                DateTime startDate = DateTime.Now.AddMonths(-1);
+                DateTime endDate = DateTime.Now;
+
+                // --- Get section name ---
+                var sections = await CanvasService.LoadSectionsAsync();
+                var section = sections.FirstOrDefault(s => s.sectionId == sectionId);
+
+                // --- Get revenue + breakdown ---
+                decimal totalRevenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, startDate, endDate);
+                var products = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
+                var archived = await ProductPlacementServices.GetArchivedProductsBySectionAsync(sectionId);
+
+                // --- Merge product lists ---
+                var productBreakdown = products
+                    .Select(p => new ProductBreakdownItem
+                    {
+                        ItemNumber = p.ItemNumber,
+                        ProductName = p.ItemNumber, // replace with lookup if needed
+                        QuantitySold = p.QuantitySold,
+                        Revenue = p.Revenue,
+                        IsActive = true,
+                        DatePlaced = p.DatePlaced
+                    })
+                    .Concat(archived.Select(a => new ProductBreakdownItem
+                    {
+                        ItemNumber = a.ItemNumber,
+                        ProductName = a.ItemNumber,
+                        QuantitySold = 0,
+                        Revenue = a.Revenue,
+                        IsActive = false,
+                        DatePlaced = a.DatePlaced
+                    }))
+                    .ToList();
+
+                int totalQty = productBreakdown.Sum(p => p.QuantitySold);
+                var topProduct = productBreakdown.OrderByDescending(p => p.Revenue).FirstOrDefault();
+
+                // --- Create ViewModel ---
+                var vm = new SectionDetailViewModel
+                {
+                    SectionId = sectionId,
+                    SectionName = string.IsNullOrWhiteSpace(section.name)
+                    ? sectionId
+                    : section.name,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    TotalRevenue = totalRevenue,
+                    TotalQuantitySold = totalQty,
+                    TopProductName = topProduct?.ProductName ?? "N/A",
+                    TopProductRevenue = topProduct?.Revenue ?? 0,
+                    ProductBreakdown = productBreakdown
+                };
+
+                // --- Load chart data (we’ll implement these soon) ---
+                vm.DailyTrendline = await ChartDataFactory.CreateDailyTrendlineAsync(sectionId, startDate, endDate);
+                vm.TopProductsBarChart = await ChartDataFactory.CreateTopProductsBarAsync(sectionId, startDate, endDate);
+                vm.SectionVsStoreComparison = await ChartDataFactory.CreateSectionVsStoreComparisonAsync(sectionId, startDate, endDate);
+
+                // --- Create and show overlay ---
+                SectionDetailOverlay.Children.Clear();
+                var detailControl = new SectionDetail(vm);
+                SectionDetailOverlay.Children.Add(detailControl);
+                SectionDetailOverlay.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading section details: {ex.Message}");
+            }
+        }
 
     }
 }
