@@ -19,6 +19,7 @@
   <ItemGroup>
     <None Remove="Assets\Couch.jpg" />
     <None Remove="Assets\SF2.png" />
+    <None Remove="Assets\Splash.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,6 +47,12 @@
 
   <ItemGroup>
     <None Include=".github\workflows\release_build.yml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <SplashScreen Include="Assets\Splash.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </SplashScreen>
   </ItemGroup>
 
 
