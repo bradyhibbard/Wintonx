@@ -1,0 +1,29 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- DARK THEME COLOR PALETTE -->
+
+    <!-- App Backgrounds -->
+    <SolidColorBrush x:Key="AppBackground" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="SurfaceBackground" Color="#252526"/>
+    <SolidColorBrush x:Key="CardBackground" Color="#2D2D30"/>
+
+    <!-- Borders & Lines -->
+    <SolidColorBrush x:Key="Divider" Color="#3C3C3C"/>
+
+    <!-- Text Colors -->
+    <SolidColorBrush x:Key="PrimaryText" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="SecondaryText" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="DisabledText" Color="#777777"/>
+
+    <!-- Accent Color (same as Light Mode) -->
+    <SolidColorBrush x:Key="Accent" Color="#0078D4"/>
+    <SolidColorBrush x:Key="AccentLight" Color="#3399E6"/>
+    <SolidColorBrush x:Key="AccentDark" Color="#005A9E"/>
+
+    <!-- Card Shadow -->
+    <DropShadowEffect x:Key="CardShadow"
+                      BlurRadius="25"
+                      ShadowDepth="0"
+                      Color="#66000000"/>
+</ResourceDictionary>

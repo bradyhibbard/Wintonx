@@ -1,57 +1,124 @@
 ﻿<Window x:Class="Winton.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Winton" Height="700" Width="1200">
-	<Grid>
-		<!-- Background image with overlay -->
-		<Image x:Name="BackgroundImage" Source="/Assets/Couch.jpg" Stretch="Fill"/>
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        MinHeight="600"
+        MinWidth="1000">
 
-		<Border Background="#A0000000" Visibility="Visible" x:Name="StartOverlay">
-			<Button Content="Start Here" HorizontalAlignment="Center" VerticalAlignment="Center" Width="100" Height="50" Click="StartButton_Click" Foreground="White" Background="Transparent">
-				<Button.Style>
-					<Style TargetType="Button">
-						<Setter Property="Background" Value="Transparent"/>
-						<Setter Property="Foreground" Value="White"/>
-						<Setter Property="BorderBrush" Value="White"/>
-						<Setter Property="BorderThickness" Value="2"/>
-						<Style.Triggers>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter Property="Background" Value="LightGray"/>
-							</Trigger>
-						</Style.Triggers>
-					</Style>
-				</Button.Style>
-			</Button>
-		</Border>
+    <!-- OUTER WINDOW FRAME -->
+    <Border Background="#F2FFFFFF"
+            CornerRadius="12"
+            SnapsToDevicePixels="True">
+        <Border.Effect>
+            <DropShadowEffect Color="#66000000"
+                              BlurRadius="30"
+                              ShadowDepth="0"/>
+        </Border.Effect>
 
-		<DockPanel LastChildFill="True" Background="#2D2D30" Visibility="Collapsed" x:Name="MainDockPanel">
-			<!-- Top Navigation Bar -->
-			<StackPanel x:Name="Sidebar" DockPanel.Dock="Top" Orientation="Horizontal" Background="#2D2D30" Height="50">
-				<ToggleButton x:Name="CollapseButton" Background="#2D2D30" Foreground="White" Width="40" Height="40"
-				              VerticalAlignment="Center" Padding="5" Click="CollapseButton_Click">
-					<TextBlock Text="≡" FontSize="16" />
-				</ToggleButton>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
+            <!-- TITLE BAR -->
+            <Grid Grid.Row="0"
+                  Height="40"
+                  Background="{DynamicResource AppBackground}"
+                  MouseDown="TitleBar_MouseDown">
 
-				<Button Content="Dashboard" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Click="Dashboard_Click"/>
-				<Button Content="Sales Floor" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Click="SalesFloor_Click"/>
-				<Button Content="Product List" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Click="ProductList_Click"/>
-				<Button Content="Reports" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Click="Reports_Click"/>
-				<Button Content="Canvas" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Click="Canvas_Click"/>
-                <Button Content="Settings" Padding="10,5" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0" Click="DB_Click"/>
-            </StackPanel>
+                <TextBlock Text="Wintonx"
+                           VerticalAlignment="Center"
+                           Margin="15,0,0,0"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryText}"/>
 
-			<StackPanel x:Name="expand" DockPanel.Dock="Top" Orientation="Horizontal" Background="#2D2D30" Height="50">
-				<!-- Expand Button (Hidden Initially, Same Position as CollapseButton) -->
-				<Button x:Name="ExpandButton" Content=">" Width="40" Height="40" Visibility="Collapsed"
-					Background="Transparent" Foreground="White" Click="ExpandButton_Click"
-					HorizontalAlignment="Left" VerticalAlignment="Center"/>
-			</StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,10,0">
 
-			<!-- Main Content Area -->
-			<Border Background="#333333" Padding="20" DockPanel.Dock="Top">
-				<ContentControl x:Name="MainContent" Background="#333333" Padding="20"/>
-			</Border>
-		</DockPanel>
-	</Grid>
+                    <Button Content="—"
+                            Width="46" Height="30"
+                            Style="{StaticResource TitleBarButtonStyle}"
+                            Click="Minimize_Click"/>
+
+                    <Button Content="✕"
+                            Width="46" Height="30"
+                            Style="{StaticResource TitleBarButtonStyle}"
+                            Click="Close_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- MAIN CONTENT ROW -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- LEFT SIDEBAR -->
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource Divider}"
+                        BorderThickness="0,0.5,0.5,0"
+                        Padding="10">
+
+                    <StackPanel x:Name="Sidebar">
+
+                        <!-- NAV BUTTONS -->
+                        <Button Style="{StaticResource NavButton}"
+                                Content="Dashboard"
+                                Click="Dashboard_Click"
+                                Margin="0 4"/>
+
+                        <Button Style="{StaticResource NavButton}"
+                                Content="Sales Floor"
+                                Click="SalesFloor_Click"
+                                Margin="0 4"/>
+
+                        <Button Style="{StaticResource NavButton}"
+                                Content="Product List"
+                                Click="ProductList_Click"
+                                Margin="0 4"/>
+
+                        <Button Style="{StaticResource NavButton}"
+                                Content="Reports"
+                                Click="Reports_Click"
+                                Margin="0 4"/>
+
+                        <Button Style="{StaticResource NavButton}"
+                                Content="Canvas"
+                                Click="Canvas_Click"
+                                Margin="0 4"/>
+
+                        <Button Style="{StaticResource NavButton}"
+                                Content="Settings"
+                                Click="DB_Click"
+                                Margin="0 4"/>
+
+                        <!-- Dummy ExpandButton so existing code-behind compiles -->
+                        <Button x:Name="ExpandButton"
+                                Visibility="Collapsed"
+                                Width="0"
+                                Height="0" />
+
+                    </StackPanel>
+                </Border>
+
+                <!-- MAIN CONTENT AREA -->
+                <Border Grid.Column="1"
+                        Background="{DynamicResource SurfaceBackground}"
+                        Padding="20">
+
+                    <ContentControl x:Name="MainContent"
+                                    Background="{DynamicResource SurfaceBackground}"
+                                    Padding="20"/>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>

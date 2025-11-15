@@ -43,16 +43,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Assets\SF2.png" />
+    <SplashScreen Include="Assets\Splash.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </SplashScreen>
   </ItemGroup>
 
   <ItemGroup>
     <None Include=".github\workflows\release_build.yml" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <SplashScreen Include="Assets\Splash.png">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </SplashScreen>
   </ItemGroup>
 
 

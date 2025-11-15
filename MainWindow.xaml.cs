@@ -1,14 +1,15 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
-using System.Xml;
+using System.Net.Http;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Diagnostics;
-using System.Reflection;
+using System.Windows.Input;
+using System.Xml;
 using Winton.Services;
 using Winton.Views;
-using System.Net.Http;
 
 namespace Winton
 {
@@ -102,14 +103,22 @@ namespace Winton
             MainContent.Content = control;
         }
 
-        private void StartButton_Click(object sender, RoutedEventArgs e)
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            StartOverlay.Visibility = Visibility.Collapsed;
-            BackgroundImage.Visibility = Visibility.Collapsed;
-            MainDockPanel.Visibility = Visibility.Visible;
-            Sidebar.Visibility = Visibility.Visible;
-            MainContent.Content = new Dashboard();
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
         }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
     }
 }
 
