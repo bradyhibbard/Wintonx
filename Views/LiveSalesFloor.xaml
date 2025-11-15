@@ -3,26 +3,50 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:local="clr-namespace:Winton.Views"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
-    <Grid>
-        <!-- Define two rows: menu bar at the top and main content below -->
+    <Grid Background="{DynamicResource SurfaceBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Menu Bar at the Top -->
-        <DockPanel Grid.Row="0" Background="#2D2D30" Height="50">
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="8">
-                <Button Content="Add Products" Click="AddProducts_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
-                <Button Content="Filters" Click="Filters_Click" Margin="5" Background="Transparent" Foreground="White" BorderThickness="0"/>
-            </StackPanel>
-        </DockPanel>
+        <!-- =====================================================
+             FLOATING TOOLBAR
+        ===================================================== -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource CardBackground}"
+                CornerRadius="8"
+                Padding="8"
+                Margin="15"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                BorderBrush="{DynamicResource Divider}"
+                BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect Color="#44000000"
+                                  BlurRadius="12"
+                                  ShadowDepth="2"/>
+            </Border.Effect>
 
-        <!-- Main Content Area -->
+            <StackPanel Orientation="Horizontal">
+                <Button Style="{StaticResource NavButton}"
+                        Content="Add Products"
+                        Click="AddProducts_Click"
+                        Padding="12,6"
+                        Margin="0,0,10,0"/>
+
+                <Button Style="{StaticResource NavButton}"
+                        Content="Filters"
+                        Click="Filters_Click"
+                        Padding="12,6"/>
+            </StackPanel>
+        </Border>
+
+        <!-- =====================================================
+             MAIN CONTENT: PANELS + CANVAS
+        ===================================================== -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="FilterPanelColumn" Width="0"/>
@@ -30,98 +54,174 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Filter Panel -->
-            <Border x:Name="FilterPanel" Grid.Column="0" Background="#F0F0F0" BorderBrush="#CCCCCC" BorderThickness="1" Visibility="Collapsed">
-                <StackPanel Margin="10">
-                    <TextBlock Text="Filter Panel" FontWeight="Bold" FontSize="14"/>
-                    <TextBlock Text="Vendor" FontSize="12"/>
-                    <TextBox x:Name="VendorTextBox" Width="200" Margin="0,5,0,10" TextChanged="VendorTextBox_TextChanged"/>
+            <!-- =====================================================
+                 FILTER PANEL (Left)
+            ===================================================== -->
+            <Border Grid.Column="0"
+                    x:Name="FilterPanel"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource Divider}"
+                    BorderThickness="0,0,1,0"
+                    Padding="16"
+                    Visibility="Collapsed">
+                <StackPanel>
 
-                    <TextBlock Text="Category" FontSize="12"/>
-                    <TextBox x:Name="CategoryTextBox" Width="200" Margin="0,5,0,10" TextChanged="CategoryTextBox_TextChanged"/>
+                    <TextBlock Text="Filters"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource PrimaryText}"
+                               Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Group" FontSize="12"/>
-                    <TextBox x:Name="GroupTextBox" Width="200" Margin="0,5,0,10" TextChanged="GroupTextBox_TextChanged"/>
+                    <TextBlock Text="Vendor" Foreground="{DynamicResource SecondaryText}"/>
+                    <TextBox x:Name="VendorTextBox"
+                             Margin="0,4,0,10"
+                             TextChanged="VendorTextBox_TextChanged"/>
 
-                    <TextBlock Text="Product" FontSize="12"/>
-                    <TextBox x:Name="ProductTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductTextBox_TextChanged"/>
+                    <TextBlock Text="Category" Foreground="{DynamicResource SecondaryText}"/>
+                    <TextBox x:Name="CategoryTextBox"
+                             Margin="0,4,0,10"
+                             TextChanged="CategoryTextBox_TextChanged"/>
+
+                    <TextBlock Text="Group" Foreground="{DynamicResource SecondaryText}"/>
+                    <TextBox x:Name="GroupTextBox"
+                             Margin="0,4,0,10"
+                             TextChanged="GroupTextBox_TextChanged"/>
+
+                    <TextBlock Text="Product" Foreground="{DynamicResource SecondaryText}"/>
+                    <TextBox x:Name="ProductTextBox"
+                             Margin="0,4,0,10"
+                             TextChanged="ProductTextBox_TextChanged"/>
+
                 </StackPanel>
             </Border>
 
-            <!-- Left Panel for Add Products -->
-            <Border x:Name="ProductPanel" Grid.Column="1" Background="White" BorderBrush="Black" BorderThickness="1" Visibility="Collapsed">
-                <Grid Margin="10">
+            <!-- =====================================================
+                 PRODUCT PANEL (Right)
+            ===================================================== -->
+            <Border Grid.Column="1"
+                    x:Name="ProductPanel"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource Divider}"
+                    BorderThickness="1,0,0,0"
+                    Padding="16"
+                    Visibility="Collapsed">
+
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1*"/>
-                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left Section: Search Inputs -->
-                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                        <TextBlock Text="Section ID" FontSize="12" Margin="10"/>
-                        <TextBox x:Name="SectionIdTextBox" Width="200" Margin="0,5,0,10" TextChanged="SectionIdTextBox_TextChanged"/>
+                    <!-- LEFT SIDE: Searching -->
+                    <StackPanel Grid.Column="0">
 
-                        <TextBlock Text="Search Products" FontSize="14" FontWeight="Bold" Margin="10"/>
+                        <TextBlock Text="Section ID"
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   Margin="0,0,0,4"/>
+                        <TextBox x:Name="SectionIdTextBox"
+                                 Margin="0,0,0,10"
+                                 TextChanged="SectionIdTextBox_TextChanged"/>
 
-                        <TextBlock Text="Vendor" FontSize="12"/>
-                        <TextBox x:Name="ProductVendorTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductVendorTextBox_TextChanged"/>
+                        <TextBlock Text="Search Products"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Margin="0,10,0,10"
+                                   Foreground="{DynamicResource PrimaryText}"/>
 
-                        <TextBlock Text="Category" FontSize="12"/>
-                        <TextBox x:Name="ProductCategoryTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductCategoryTextBox_TextChanged"/>
+                        <TextBlock Text="Vendor" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox x:Name="ProductVendorTextBox"
+                                 Margin="0,4,0,10"
+                                 TextChanged="ProductVendorTextBox_TextChanged"/>
 
-                        <TextBlock Text="Group" FontSize="12"/>
-                        <TextBox x:Name="ProductGroupTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductGroupTextBox_TextChanged"/>
+                        <TextBlock Text="Category" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox x:Name="ProductCategoryTextBox"
+                                 Margin="0,4,0,10"
+                                 TextChanged="ProductCategoryTextBox_TextChanged"/>
 
-                        <TextBlock Text="Product" FontSize="12"/>
-                        <TextBox x:Name="AddProductTextBox" Width="200" Margin="0,5,0,10" TextChanged="ProductProductTextBox_TextChanged"/>
+                        <TextBlock Text="Group" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox x:Name="ProductGroupTextBox"
+                                 Margin="0,4,0,10"
+                                 TextChanged="ProductGroupTextBox_TextChanged"/>
 
-                        <Button Content="View Section Archive" Click="ViewSectionArchive_Click" Margin="10"/>
+                        <TextBlock Text="Product" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox x:Name="AddProductTextBox"
+                                 Margin="0,4,0,10"
+                                 TextChanged="ProductProductTextBox_TextChanged"/>
+
+                        <Button Content="View Section Archive"
+                                Click="ViewSectionArchive_Click"
+                                Margin="0,10,0,0"/>
+
                     </StackPanel>
 
-                    <!-- Right Section: Search Results and Added Products (Scroll Enabled) -->
-                    <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <!-- RIGHT SIDE -->
+                    <ScrollViewer Grid.Column="1"
+                                  VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <CheckBox x:Name="SelectAllCheckBox" Content="Select All" Margin="10" Checked="SelectAllCheckBox_Checked" Unchecked="SelectAllCheckBox_Unchecked"/>
 
-                            <ListBox x:Name="FilteredProductsListBox" Height="250" SelectionMode="Multiple" Margin="0,0,0,10"/>
+                            <CheckBox x:Name="SelectAllCheckBox"
+                                      Content="Select All"
+                                      Margin="0,0,0,10"
+                                      Checked="SelectAllCheckBox_Checked"
+                                      Unchecked="SelectAllCheckBox_Unchecked"/>
 
-                            <Button Content="Add Products" Click="AddProductButton_Click" Margin="10"/>
+                            <ListBox x:Name="FilteredProductsListBox"
+                                     Height="250"
+                                     SelectionMode="Multiple"
+                                     Margin="0,0,0,10"/>
 
-                            <TextBlock Text="Added Products" FontSize="14" FontWeight="Bold" Margin="10"/>
-                            <ListBox x:Name="AddedProductsListBox" Height="250" SelectionMode="Single" SelectionChanged="AddedProductsListBox_SelectionChanged"/>
+                            <Button Content="Add Products"
+                                    Click="AddProductButton_Click"
+                                    Margin="0,0,0,10"/>
 
-                            <TextBlock Text="Date Added" FontSize="12" Margin="10"/>
-                            <DatePicker x:Name="DateAddedPicker" Margin="10" SelectedDateChanged="DateAddedPicker_SelectedDateChanged"/>
+                            <TextBlock Text="Added Products"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Margin="0,10,0,10"/>
 
-                            <Button Content="Remove Selected" Click="RemoveProductButton_Click" Margin="10"/>
+                            <ListBox x:Name="AddedProductsListBox"
+                                     Height="250"
+                                     SelectionMode="Single"
+                                     Margin="0,0,0,10"
+                                     SelectionChanged="AddedProductsListBox_SelectionChanged"/>
+
+                            <TextBlock Text="Date Added"
+                                       FontSize="12"
+                                       Margin="0,10,0,4"/>
+
+                            <DatePicker x:Name="DateAddedPicker"
+                                        Margin="0,0,0,10"
+                                        SelectedDateChanged="DateAddedPicker_SelectedDateChanged"/>
+
+                            <Button Content="Remove Selected"
+                                    Click="RemoveProductButton_Click"/>
+
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
             </Border>
 
-            <!-- Main Visualization Area -->
-            <Grid Grid.Column="2">
+            <!-- =====================================================
+                 CANVAS AREA
+            ===================================================== -->
+            <Grid Grid.Column="2" Background="{DynamicResource SurfaceBackground}">
+
                 <Viewbox Stretch="Uniform">
                     <Canvas x:Name="LiveFloorCanvas"
-                            Background="LightGray"
+                            Background="{DynamicResource SurfaceBackground}"
                             Width="1200"
-                            Height="500"/>
+                            Height="600"/>
                 </Viewbox>
 
-                <!-- Overlay canvas for floating revenue boxes -->
                 <Canvas x:Name="RevenueOverlayCanvas"
+                        Background="Transparent"
                         IsHitTestVisible="True"
-                        Panel.ZIndex="20"
-                        Background="Transparent"/>
-                <!-- Analytics Detail Overlay -->
+                        Panel.ZIndex="20"/>
+
                 <Grid x:Name="SectionDetailOverlay"
-                        Background="#AA000000"
-                        Visibility="Collapsed"
-                        Panel.ZIndex="50"
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Stretch"
-                        Margin="0">
-                </Grid>
+                      Background="#AA000000"
+                      Visibility="Collapsed"
+                      Panel.ZIndex="50"/>
             </Grid>
         </Grid>
     </Grid>

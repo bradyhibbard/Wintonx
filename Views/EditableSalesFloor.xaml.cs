@@ -332,32 +332,52 @@ namespace Winton.Views
             double width = SalesFloorCanvas.ActualWidth;
             double height = SalesFloorCanvas.ActualHeight;
 
+            // Use theme-aware color:
+            Brush gridBrush = (Brush)Application.Current.Resources["GridLineColor"]
+                               ?? new SolidColorBrush(Color.FromArgb(0x22, 0x00, 0x00, 0x00)); // default
+
+            // Remove any old grid lines first
+            var oldLines = SalesFloorCanvas.Children.OfType<Line>()
+                            .Where(l => l.Tag as string == "GridLine")
+                            .ToList();
+
+            foreach (var line in oldLines)
+                SalesFloorCanvas.Children.Remove(line);
+
+            // Redraw grid
             for (int x = 0; x < width; x += GridSpacing)
             {
-                SalesFloorCanvas.Children.Add(new Line
+                var line = new Line
                 {
                     X1 = x,
                     Y1 = 0,
                     X2 = x,
                     Y2 = height,
-                    Stroke = Brushes.White,
-                    StrokeThickness = 0.5
-                });
+                    Stroke = gridBrush,
+                    StrokeThickness = 0.7,
+                    SnapsToDevicePixels = true,
+                    Tag = "GridLine"
+                };
+                SalesFloorCanvas.Children.Add(line);
             }
 
             for (int y = 0; y < height; y += GridSpacing)
             {
-                SalesFloorCanvas.Children.Add(new Line
+                var line = new Line
                 {
                     X1 = 0,
                     Y1 = y,
                     X2 = width,
                     Y2 = y,
-                    Stroke = Brushes.White,
-                    StrokeThickness = 0.5
-                });
+                    Stroke = gridBrush,
+                    StrokeThickness = 0.7,
+                    SnapsToDevicePixels = true,
+                    Tag = "GridLine"
+                };
+                SalesFloorCanvas.Children.Add(line);
             }
         }
+
 
         #endregion
 
