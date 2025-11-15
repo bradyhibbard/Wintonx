@@ -4,66 +4,129 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DesignHeight="400" d:DesignWidth="800">
+             Background="{DynamicResource AppBackground}">
 
-	<Grid Background="Transparent" Margin="0,0,-25,-60">
-		<!-- StackPanel to arrange buttons vertically in the upper-left corner -->
-		<StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="20,20,0,0">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  Background="{DynamicResource AppBackground}">
 
-            <TextBlock Text="{Binding AppVersion}"
-                   Foreground="White"
-                   HorizontalAlignment="Left"
-                   Margin="20,20,50,50"
-                   FontSize="14" />
+        <StackPanel Margin="30" Width="500">
 
+            <!-- SETTINGS PAGE TITLE -->
+            <TextBlock Text="Settings"
+                       FontSize="28"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource PrimaryText}"
+                       Margin="0,0,0,20"/>
 
-            <!-- Test Connection Button -->
-			<Button Content="Test Connection" 
-                    Width="200" 
-                    Height="50" 
-                    Background="Transparent" 
-                    Foreground="White"
-                    BorderBrush="White" 
-                    BorderThickness="2"
-                    FontSize="16"
-                    Margin="0,10,0,10"
-				    Click="TestConnection_Click"/>
+            <!-- ==========================
+                 SECTION: APP INFO
+            =========================== -->
+            <Border Background="{DynamicResource CardBackground}"
+                    CornerRadius="10"
+                    Padding="20"
+                    Margin="0,0,0,20"
+                    BorderBrush="{DynamicResource Divider}"
+                    BorderThickness="1">
 
-			<!-- Backup Database Button -->
-			<Button Content="Backup Database" 
-                    Width="200" 
-                    Height="50" 
-                    Background="Transparent" 
-                    Foreground="White"
-                    BorderBrush="White" 
-                    BorderThickness="2"
-                    FontSize="16"
-                    Margin="0,10,0,0"
-					Click="BackupDatabase_Click"/>
+                <Border.Effect>
+                    <DropShadowEffect Color="#33000000"
+                                      BlurRadius="15"
+                                      ShadowDepth="1"/>
+                </Border.Effect>
 
-			<!-- Restore Database Button -->
-			<Button Content="Restore Database" 
-                    Width="200" 
-                    Height="50" 
-                    Background="Transparent" 
-                    Foreground="White"
-                    BorderBrush="White" 
-                    BorderThickness="2"
-                    FontSize="16"
-                    Margin="0,20,0,0"
-					Click="RestoreDatabase_Click"/>
+                <StackPanel>
+                    <TextBlock Text="Application"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource PrimaryText}"
+                               Margin="0,0,0,10"/>
 
-			<!-- Check for Updates Button -->
-			<Button Content="Check for Updates" 
-                    Width="200" 
-                    Height="50" 
-                    Background="Transparent" 
-                    Foreground="White"
-                    BorderBrush="White" 
-                    BorderThickness="2"
-                    FontSize="16"
-                    Margin="0,20,0,0"
-					Click="CheckForUpdates_Click"/>
-		</StackPanel>
-	</Grid>
+                    <TextBlock Text="Version:"
+                               Foreground="{DynamicResource SecondaryText}"
+                               Margin="0,0,0,5"/>
+
+                    <TextBlock Text="{Binding AppVersion}"
+                               Foreground="{DynamicResource PrimaryText}"
+                               FontSize="14"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ==========================
+                 SECTION: DATABASE TOOLS
+            =========================== -->
+            <Border Background="{DynamicResource CardBackground}"
+                    CornerRadius="10"
+                    Padding="20"
+                    Margin="0,0,0,20"
+                    BorderBrush="{DynamicResource Divider}"
+                    BorderThickness="1">
+
+                <Border.Effect>
+                    <DropShadowEffect Color="#33000000"
+                                      BlurRadius="15"
+                                      ShadowDepth="1"/>
+                </Border.Effect>
+
+                <StackPanel>
+
+                    <TextBlock Text="Database Tools"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource PrimaryText}"
+                               Margin="0,0,0,20"/>
+
+                    <Button Style="{StaticResource NavButton}"
+                            Content="Test Connection"
+                            Padding="14,8"
+                            Margin="0,0,0,10"
+                            Click="TestConnection_Click"/>
+
+                    <Button Style="{StaticResource NavButton}"
+                            Content="Backup Database"
+                            Padding="14,8"
+                            Margin="0,0,0,10"
+                            Click="BackupDatabase_Click"/>
+
+                    <Button Style="{StaticResource NavButton}"
+                            Content="Restore Database"
+                            Padding="14,8"
+                            Margin="0,0,0,10"
+                            Click="RestoreDatabase_Click"/>
+
+                    <Button Style="{StaticResource NavButton}"
+                            Content="Check for Updates"
+                            Padding="14,8"
+                            Click="CheckForUpdates_Click"/>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ==========================
+                 FUTURE SETTINGS SECTION
+                 (Theme, Preferences, etc.)
+            =========================== -->
+            <Border Background="{DynamicResource CardBackground}"
+                    CornerRadius="10"
+                    Padding="20"
+                    Margin="0,0,0,20"
+                    BorderBrush="{DynamicResource Divider}"
+                    BorderThickness="1"
+                    Visibility="Collapsed"
+                    x:Name="FutureSettingsCard">
+
+                <Border.Effect>
+                    <DropShadowEffect Color="#33000000"
+                                      BlurRadius="15"
+                                      ShadowDepth="1"/>
+                </Border.Effect>
+
+                <TextBlock Text="More Settings Coming Soon"
+                           Foreground="{DynamicResource SecondaryText}"
+                           FontSize="16"/>
+            </Border>
+
+        </StackPanel>
+
+    </ScrollViewer>
+
 </UserControl>
