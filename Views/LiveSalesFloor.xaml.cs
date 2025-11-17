@@ -152,6 +152,8 @@ namespace Winton.Views
             column.BeginAnimation(ColumnDefinition.WidthProperty, animation);
         }
 
+
+
         private void AddProducts_Click(object sender, RoutedEventArgs e)
         {
             ToggleProductPanel(!_isProductPanelOpen);
@@ -729,6 +731,27 @@ namespace Winton.Views
             {
                 MessageBox.Show($"Error loading section details: {ex.Message}");
             }
+        }
+
+        private void ShowFilterPanel()
+        {
+            ProductPanel.Visibility = Visibility.Collapsed;
+            FilterPanel.Visibility = Visibility.Visible;
+
+        }
+
+        private void ShowProductPanel()
+        {
+            FilterPanel.Visibility = Visibility.Collapsed;
+            ProductPanel.Visibility = Visibility.Visible;
+
+        }
+
+        private void HidePanels()
+        {
+            FilterPanel.Visibility = Visibility.Collapsed;
+            ProductPanel.Visibility = Visibility.Collapsed;
+
         }
 
     }

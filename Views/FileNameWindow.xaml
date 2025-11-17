@@ -3,21 +3,74 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:Winton.Views"
         mc:Ignorable="d"
-        Title="FileNameWindow" Height="450" Width="800">
-	<Grid>
-		<StackPanel>
-			<TextBlock Text="Selected File:" Margin="10"/>
-			<TextBox x:Name="txtFileName" Margin="10"/>
+        Title="Save Report"
+        Height="330"
+        Width="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppBackground}"
+        ResizeMode="NoResize">
 
-			<TextBlock Text="Report Date:" Margin="10"/>
-			<DatePicker x:Name="datePicker" Margin="10"/>
+    <Grid Background="{DynamicResource AppBackground}">
 
-			<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
-				<Button Content="OK" Width="80" Margin="5" Click="Ok_Click"/>
-				<Button Content="Cancel" Width="80" Margin="5" Click="Cancel_Click"/>
-			</StackPanel>
-		</StackPanel>
-	</Grid>
+        <!-- Floating Card -->
+        <Border Background="{DynamicResource CardBackground}"
+                CornerRadius="12"
+                Padding="20"
+                Width="420"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                BorderBrush="{DynamicResource Divider}"
+                BorderThickness="1">
+
+            <Border.Effect>
+                <DropShadowEffect Color="#33000000"
+                                  BlurRadius="20"
+                                  ShadowDepth="1"/>
+            </Border.Effect>
+
+            <StackPanel>
+
+                <!-- Title -->
+                <TextBlock Text="Save Report"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryText}"
+                           Margin="0,0,0,20"
+                           HorizontalAlignment="Center"/>
+
+                <!-- Selected File -->
+                <TextBlock Text="Selected File"
+                           Foreground="{DynamicResource SecondaryText}"
+                           FontSize="14"/>
+                <TextBox x:Name="txtFileName"
+                         Margin="0,5,0,20"/>
+
+                <!-- Report Date -->
+                <TextBlock Text="Report Date"
+                           Foreground="{DynamicResource SecondaryText}"
+                           FontSize="14"/>
+                <DatePicker x:Name="datePicker"
+                            Margin="0,5,0,20"/>
+
+                <!-- Buttons -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+
+                    <Button Content="Cancel"
+                            Style="{StaticResource NavButton}"
+                            Margin="0,0,10,0"
+                            Width="90"
+                            Click="Cancel_Click"/>
+
+                    <Button Content="Save"
+                            Style="{StaticResource NavButton}"
+                            Width="90"
+                            Click="Ok_Click"/>
+
+                </StackPanel>
+
+            </StackPanel>
+        </Border>
+    </Grid>
 </Window>

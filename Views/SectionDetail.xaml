@@ -1,36 +1,43 @@
 ﻿<UserControl x:Class="Winton.Views.SectionDetail"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Winton.Views"
              xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+             xmlns:conv="clr-namespace:Winton.Converters"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:conv="clr-namespace:Winton.Converters"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="900"
-             Background="#AA1E1E1E">
+             Background="#88000000"
+             d:DesignHeight="600" d:DesignWidth="900">
 
     <UserControl.Resources>
-        <conv:MultiplyConverter x:Key="MultiplyConverter"/>
+        <conv:MultiplyConverter x:Key="MultiplyConverter" />
     </UserControl.Resources>
 
-    <Grid>
+    <!-- OVERLAY BACKGROUND -->
+    <Grid Background="#22000000">
 
-        <!-- MODAL WINDOW -->
-        <Border Background="#2D2D30"
-                CornerRadius="10"
+        <!-- FLOATING LIGHT-THEME MODAL -->
+        <Border Background="{DynamicResource CardBackground}"
+                CornerRadius="12"
                 Padding="20"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Width="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ActualWidth, Converter={StaticResource MultiplyConverter}, ConverterParameter=0.75}"
-                Height="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ActualHeight, Converter={StaticResource MultiplyConverter}, ConverterParameter=0.65}">
+                BorderBrush="{DynamicResource Divider}"
+                BorderThickness="1"
+                Width="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, 
+                        Path=ActualWidth, Converter={StaticResource MultiplyConverter}, ConverterParameter=0.85}"
+                Height="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, 
+                         Path=ActualHeight, Converter={StaticResource MultiplyConverter}, ConverterParameter=0.80}">
 
-            <!-- ⭐ NEW: SCROLLVIEWER WRAPS THE ENTIRE CONTENT ⭐ -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Padding="0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20"
+                                  ShadowDepth="0"
+                                  Color="#88000000"/>
+            </Border.Effect>
 
-                <Grid>
+            <!-- MAIN SCROLL CONTAINER -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <!-- Header -->
@@ -44,75 +51,138 @@
                         <!-- Table -->
                     </Grid.RowDefinitions>
 
-                    <!-- HEADER -->
+                    <!-- ======================================================
+                         HEADER
+                    ====================================================== -->
                     <DockPanel Grid.Row="0" Margin="0,0,0,20">
                         <TextBlock Text="{Binding SectionName}"
-                                   FontSize="26"
-                                   FontWeight="Bold"
-                                   Foreground="White"
+                                   FontSize="28"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryText}"
                                    DockPanel.Dock="Left"/>
+
                         <Button Content="✕"
-                                Width="40" Height="40"
+                                Width="36" Height="36"
                                 HorizontalAlignment="Right"
                                 Click="Close_Click"
                                 Background="Transparent"
-                                Foreground="White"
-                                BorderBrush="Transparent"/>
+                                Foreground="{DynamicResource PrimaryText}"
+                                BorderBrush="Transparent"
+                                FontSize="16"
+                                Cursor="Hand"/>
                     </DockPanel>
 
-                    <!-- DATE RANGE -->
-                    <StackPanel Orientation="Horizontal"
-                                Grid.Row="1"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,10">
+                    <!-- ======================================================
+                         DATE RANGE
+                    ====================================================== -->
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                Margin="0,0,0,0">
+
                         <TextBlock Text="{Binding StartDate, StringFormat='{}{0:MMM dd, yyyy}'}"
-                                   Foreground="LightGray" FontSize="14"/>
-                        <TextBlock Text=" — " Foreground="LightGray" FontSize="14"/>
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   FontSize="14"/>
+
+                        <TextBlock Text=" — "
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   FontSize="14"/>
+
                         <TextBlock Text="{Binding EndDate, StringFormat='{}{0:MMM dd, yyyy}'}"
-                                   Foreground="LightGray" FontSize="14"/>
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   FontSize="14"/>
                     </StackPanel>
 
-                    <!-- SUMMARY CARDS -->
-                    <UniformGrid Grid.Row="2" Columns="3" Margin="0,10,0,20">
-                        <Border Background="#3A3A3C" CornerRadius="8" Padding="10" Margin="5">
+                    <!-- ======================================================
+                         SUMMARY CARDS
+                    ====================================================== -->
+                    <UniformGrid Grid.Row="2"
+                                 Columns="3"
+                                 Margin="0,0,0,0">
+
+                        <Border Background="{DynamicResource SurfaceBackground}"
+                                CornerRadius="8"
+                                BorderBrush="{DynamicResource Divider}"
+                                BorderThickness="1"
+                                Padding="16"
+                                Margin="6">
+
                             <StackPanel>
-                                <TextBlock Text="Total Revenue" Foreground="LightGray" FontSize="12"/>
+                                <TextBlock Text="Total Revenue"
+                                           Foreground="{DynamicResource SecondaryText}"
+                                           FontSize="13"/>
                                 <TextBlock Text="{Binding TotalRevenue, StringFormat='{}{0:C}'}"
-                                           Foreground="White" FontSize="22" FontWeight="Bold"/>
+                                           FontSize="22"
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontWeight="SemiBold"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Background="#3A3A3C" CornerRadius="8" Padding="10" Margin="5">
+                        <Border Background="{DynamicResource SurfaceBackground}"
+                                CornerRadius="8"
+                                BorderBrush="{DynamicResource Divider}"
+                                BorderThickness="1"
+                                Padding="16"
+                                Margin="6">
+
                             <StackPanel>
-                                <TextBlock Text="Quantity Sold" Foreground="LightGray" FontSize="12"/>
+                                <TextBlock Text="Quantity Sold"
+                                           Foreground="{DynamicResource SecondaryText}"
+                                           FontSize="13"/>
                                 <TextBlock Text="{Binding TotalQuantitySold}"
-                                           Foreground="White" FontSize="22" FontWeight="Bold"/>
+                                           FontSize="22"
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontWeight="SemiBold"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Background="#3A3A3C" CornerRadius="8" Padding="10" Margin="5">
+                        <Border Background="{DynamicResource SurfaceBackground}"
+                                CornerRadius="8"
+                                BorderBrush="{DynamicResource Divider}"
+                                BorderThickness="1"
+                                Padding="16"
+                                Margin="6">
+
                             <StackPanel>
-                                <TextBlock Text="Top Product" Foreground="LightGray" FontSize="12"/>
+                                <TextBlock Text="Top Product"
+                                           Foreground="{DynamicResource SecondaryText}"
+                                           FontSize="13"/>
                                 <TextBlock Text="{Binding TopProductName}"
-                                           Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                                           FontSize="20"
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontWeight="SemiBold"/>
                                 <TextBlock Text="{Binding TopProductRevenue, StringFormat='{}{0:C}'}"
-                                           Foreground="White" FontSize="14"/>
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontSize="14"/>
                             </StackPanel>
                         </Border>
+
                     </UniformGrid>
 
-                    <!-- CHARTS -->
-                    <Grid Grid.Row="3" Margin="0,0,0,20">
+                    <!-- ======================================================
+                         CHARTS
+                    ====================================================== -->
+                    <Grid Grid.Row="3" Margin="0,0,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="2*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="#3A3A3C" CornerRadius="8" Margin="5" Padding="10">
+                        <!-- DAILY TREND -->
+                        <Border Grid.Column="0"
+                                Background="{DynamicResource SurfaceBackground}"
+                                CornerRadius="8"
+                                BorderBrush="{DynamicResource Divider}"
+                                BorderThickness="1"
+                                Margin="6"
+                                Padding="16">
+
                             <StackPanel>
                                 <TextBlock Text="Revenue Trend (Daily)"
-                                           Foreground="White" FontSize="16"
-                                           FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8"/>
+
                                 <lvc:CartesianChart Series="{Binding DailyTrendline}" LegendLocation="Right">
                                     <lvc:CartesianChart.AxisX>
                                         <lvc:Axis Title="Date" LabelsRotation="15"/>
@@ -124,32 +194,53 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="1" Background="#3A3A3C" CornerRadius="8" Margin="5" Padding="10">
+                        <!-- TOP 5 BAR -->
+                        <Border Grid.Column="1"
+                                Background="{DynamicResource SurfaceBackground}"
+                                CornerRadius="8"
+                                BorderBrush="{DynamicResource Divider}"
+                                BorderThickness="1"
+                                Margin="6"
+                                Padding="16">
+
                             <StackPanel>
                                 <TextBlock Text="Top 5 Products"
-                                           Foreground="White" FontSize="16"
-                                           FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8"/>
+
                                 <lvc:CartesianChart Series="{Binding TopProductsBarChart}" LegendLocation="Right">
                                     <lvc:CartesianChart.AxisY>
                                         <lvc:Axis Title="Revenue ($)"/>
                                     </lvc:CartesianChart.AxisY>
                                 </lvc:CartesianChart>
                             </StackPanel>
+
                         </Border>
                     </Grid>
 
-                    <!-- PRODUCT TABLE -->
-                    <Border Grid.Row="4" Background="#3A3A3C" CornerRadius="8" Padding="10">
+                    <!-- ======================================================
+                         PRODUCT TABLE
+                    ====================================================== -->
+                    <Border Grid.Row="4"
+                            Background="{DynamicResource SurfaceBackground}"
+                            CornerRadius="8"
+                            BorderBrush="{DynamicResource Divider}"
+                            BorderThickness="1"
+                            Padding="16">
+
                         <DataGrid ItemsSource="{Binding ProductBreakdown}"
                                   AutoGenerateColumns="False"
-                                  Foreground="White"
                                   GridLinesVisibility="None"
                                   HeadersVisibility="Column"
                                   CanUserAddRows="False"
-                                  Background="Transparent"
-                                  BorderBrush="Transparent"
-                                  RowBackground="#2D2D30"
-                                  AlternatingRowBackground="#39393B">
+                                  Background="{DynamicResource SurfaceBackground}"
+                                  BorderBrush="{DynamicResource Divider}"
+                                  Foreground="{DynamicResource PrimaryText}"
+                                  RowBackground="White"
+                                  AlternatingRowBackground="#F8F8F8">
+
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Item #" Binding="{Binding ItemNumber}" Width="*" />
                                 <DataGridTextColumn Header="Product Name" Binding="{Binding ProductName}" Width="2*" />
@@ -158,11 +249,13 @@
                                 <DataGridCheckBoxColumn Header="Active" Binding="{Binding IsActive}" Width="*" />
                                 <DataGridTextColumn Header="Date Placed" Binding="{Binding DatePlaced, StringFormat='{}{0:MMM dd, yyyy}'}" Width="*" />
                             </DataGrid.Columns>
+
                         </DataGrid>
                     </Border>
 
                 </Grid>
             </ScrollViewer>
+
         </Border>
 
     </Grid>
