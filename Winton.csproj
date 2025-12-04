@@ -52,6 +52,10 @@
     <None Include=".github\workflows\release_build.yml" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Properties\PublishProfiles\" />
+  </ItemGroup>
+
 
 
 </Project>

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Xml;
 using Winton.Services;
 using Winton.Views;
@@ -15,18 +16,17 @@ namespace Winton
 {
     public partial class MainWindow : Window
     {
-        private const string UpdateManifestUrl = @"\\YOUR_NETWORK_PATH\Winton.application"; // Update with actual UNC path to the Winton.application manifest file
         private EditableSalesFloor _salesFloor;
 
         public MainWindow()
         {
             InitializeComponent();
+
             Loaded += async (s, e) =>
             {
                 await InitializeAsync();
             };
         }
-
 
         /// <summary>
         /// Asynchronous initialization of database and other startup tasks.
@@ -39,19 +39,70 @@ namespace Winton
             MainContent.Content = new Dashboard();  // Load Dashboard after DB initializes
         }
 
+        // -----------------------------------------------------------
+        //  ⭐ WORKING-AREA MAXIMIZE / RESTORE LOGIC (CUSTOM MAXIMIZE)
+        // -----------------------------------------------------------
 
-        private void CollapseButton_Click(object sender, RoutedEventArgs e)
+        private bool _isWorkingAreaMaximized = false;
+        private Rect _restoreBounds;
+
+        private void ToggleWindowState()
         {
-            Sidebar.Visibility = Visibility.Collapsed;
-            ExpandButton.Visibility = Visibility.Visible;  // Show expand button in the same top position
+            if (!_isWorkingAreaMaximized)
+            {
+                // Save current bounds for restore
+                _restoreBounds = new Rect(Left, Top, Width, Height);
+
+                // Get usable screen area (taskbar excluded)
+                var workingArea = SystemParameters.WorkArea;
+
+                Left = workingArea.Left;
+                Top = workingArea.Top;
+                Width = workingArea.Width;
+                Height = workingArea.Height;
+
+                _isWorkingAreaMaximized = true;
+            }
+            else
+            {
+                // Restore back to previous size/position
+                Left = _restoreBounds.Left;
+                Top = _restoreBounds.Top;
+                Width = _restoreBounds.Width;
+                Height = _restoreBounds.Height;
+
+                _isWorkingAreaMaximized = false;
+            }
         }
 
-        private void ExpandButton_Click(object sender, RoutedEventArgs e)
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            Sidebar.Visibility = Visibility.Visible;
-            ExpandButton.Visibility = Visibility.Collapsed; // Hide expand button when sidebar is shown
+            if (e.ClickCount == 2 && e.ChangedButton == MouseButton.Left)
+            {
+                ToggleWindowState();
+                return;
+            }
+
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                // If dragging while maximized, restore first (optional Windows-like behavior)
+                DragMove();
+            }
         }
 
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        // -----------------------------------------------------------
+        //               ⭐ NAVIGATION BUTTON HANDLERS
+        // -----------------------------------------------------------
 
         private void Dashboard_Click(object sender, RoutedEventArgs e)
         {
@@ -61,11 +112,6 @@ namespace Winton
         private void SalesFloor_Click(object sender, RoutedEventArgs e)
         {
             MainContent.Content = new LiveSalesFloor();
-        }
-
-        private void BugReport_Click(object sender, RoutedEventArgs e)
-        {
-            MainContent.Content = new BugReport();
         }
 
         private void ProductList_Click(object sender, RoutedEventArgs e)
@@ -83,11 +129,6 @@ namespace Winton
             MainContent.Content = new DBControl();
         }
 
-        public EditableSalesFloor SalesFloorInstance
-        {
-            get { return _salesFloor; }
-        }
-
         private void Canvas_Click(object sender, RoutedEventArgs e)
         {
             if (_salesFloor == null)
@@ -95,30 +136,18 @@ namespace Winton
                 _salesFloor = new EditableSalesFloor();
             }
 
-            MainContent.Content = _salesFloor; // Ensure we always use the same instance
+            MainContent.Content = _salesFloor; // Ensure we always reuse same instance
+        }
+
+        public EditableSalesFloor SalesFloorInstance
+        {
+            get { return _salesFloor; }
         }
 
         public void SetMainContent(UserControl control)
         {
             MainContent.Content = control;
         }
-
-        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left)
-                DragMove();
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            WindowState = WindowState.Minimized;
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
-
     }
 }
 

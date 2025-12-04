@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using System.Windows.Threading;      // ✅ For DispatcherTimer
 using Winton.Helpers;
 using Winton.Models;
 using Winton.Services;
@@ -22,10 +23,14 @@ namespace Winton.Views
         private string _currentSectionId = null;
         private bool _isFilterPanelOpen = false;
         private bool _isProductPanelOpen = false;
-        private double _filterPanelWidth => ActualWidth * 0.2;
-        private double _productPanelWidth => ActualWidth * 0.4;
+        private double _filterPanelWidth => ActualWidth * 0.3;
+        private double _productPanelWidth => ActualWidth * 0.3;
         private SectionManager _sectionManager;
         private Polyline _perimeterLine = new Polyline { Stroke = Brushes.Black, StrokeThickness = 2 };
+
+        // ✅ Debounce timers for filters
+        private DispatcherTimer _filterPanelDebounceTimer;
+        private DispatcherTimer _productPanelDebounceTimer;
 
         public LiveSalesFloor()
         {
@@ -72,7 +77,8 @@ namespace Winton.Views
                 if (button != null)
                 {
                     button.Focusable = true;  // Ensure the button can receive focus
-                    button.MouseDoubleClick += Section_MouseDoubleClick;
+                    button.PreviewMouseDoubleClick += Section_MouseDoubleClick;
+
 
                     // Add a debug log to verify the event is attached
                     Console.WriteLine($"DoubleClick event attached to section {section.sectionId}");
@@ -80,21 +86,21 @@ namespace Winton.Views
             }
         }
 
-
-        private void Section_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void Section_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            e.Handled = true;
+
             if (sender is Button sectionButton && sectionButton.Tag is string sectionId)
             {
                 _currentSectionId = sectionId;
 
-                // Load section details
+                // Load the section data
                 _ = LoadSectionDetails(sectionId);
 
                 // Open the Add Product Panel
                 ToggleProductPanel(true);
             }
         }
-
 
 
         private async Task LoadPerimeterAsync()
@@ -152,13 +158,10 @@ namespace Winton.Views
             column.BeginAnimation(ColumnDefinition.WidthProperty, animation);
         }
 
-
-
         private void AddProducts_Click(object sender, RoutedEventArgs e)
         {
             ToggleProductPanel(!_isProductPanelOpen);
         }
-
 
         private void ToggleFilterPanel(bool open)
         {
@@ -183,11 +186,41 @@ namespace Winton.Views
             FilterPanelColumn.BeginAnimation(ColumnDefinition.WidthProperty, animation);
         }
 
+        // ✅ Debounce helper to avoid filtering on every keystroke
+        private void DebounceFilter(Action action, ref DispatcherTimer timer, int delayMs = 250)
+        {
+            if (timer == null)
+            {
+                timer = new DispatcherTimer();
+                timer.Interval = TimeSpan.FromMilliseconds(delayMs);
+
+                var localTimer = timer;
+
+                localTimer.Tick += (s, e) =>
+                {
+                    localTimer.Stop();
+                    action();
+                };
+            }
+
+            timer.Stop();
+            timer.Start();
+        }
+
+
+
         // PRODUCT PANEL METHODS
-        private void ProductVendorTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProductPanel();
-        private void ProductCategoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProductPanel();
-        private void ProductGroupTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProductPanel();
-        private void ProductProductTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProductPanel();
+        private void ProductVendorTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
+
+        private void ProductCategoryTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
+
+        private void ProductGroupTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
+
+        private void ProductProductTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
 
         private void FilterProductPanel()
         {
@@ -207,17 +240,23 @@ namespace Winton.Views
             UpdateFilteredProductsList(filteredProducts);
         }
 
-
         private void Filters_Click(object sender, RoutedEventArgs e)
         {
             ToggleFilterPanel(!_isFilterPanelOpen);
         }
 
-        // FILTER PANEL METHODS
-        private void VendorTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
-        private void CategoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
-        private void GroupTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
-        private void ProductTextBox_TextChanged(object sender, TextChangedEventArgs e) => FilterProducts();
+        // FILTER PANEL METHODS (now debounced)
+        private void VendorTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
+
+        private void CategoryTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
+
+        private void GroupTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
+
+        private void ProductTextBox_TextChanged(object sender, TextChangedEventArgs e)
+            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
 
         private void FilterProducts()
         {
@@ -236,8 +275,22 @@ namespace Winton.Views
 
             UpdateFilteredProductsList(filteredProducts);
 
+            // ✅ Skip heavy DB + overlay work if there is no actual filter input
+            bool anyInput = !(string.IsNullOrEmpty(vendorInput) &&
+                              string.IsNullOrEmpty(categoryInput) &&
+                              string.IsNullOrEmpty(groupInput) &&
+                              string.IsNullOrEmpty(productInput));
+
+            if (!anyInput)
+            {
+                ClearHighlights();
+                RevenueOverlayCanvas.Children.Clear();
+                return;
+            }
+
             _ = HighlightForFilteredProductsAsync(filteredProducts);
         }
+
         private void UpdateFilteredProductsList(List<Product> products)
         {
             FilteredProductsListBox.Items.Clear();
@@ -300,7 +353,6 @@ namespace Winton.Views
             await LoadAddedProducts(_currentSectionId);
         }
 
-
         private async Task LoadSectionDetails(string sectionId)
         {
             _currentSectionId = sectionId;
@@ -338,8 +390,6 @@ namespace Winton.Views
                 Console.WriteLine($"Error loading products for section {sectionId}: {ex.Message}");
             }
         }
-
-
 
         private async void SectionIdTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -470,7 +520,7 @@ namespace Winton.Views
             archiveWindow.Show();
         }
 
-        //Highlighting the Filtered Products
+        // Highlighting the Filtered Products
 
         private void ClearHighlights()
         {
@@ -531,7 +581,6 @@ namespace Winton.Views
 
         private async Task HighlightForFilteredProductsAsync(List<Product> filteredProducts)
         {
-            // Debug log to confirm this method is running
             Console.WriteLine("HighlightForFilteredProductsAsync triggered");
 
             var vendorInput = VendorTextBox.Text?.Trim();
@@ -571,8 +620,9 @@ namespace Winton.Views
                 return;
             }
 
-            // Fetch matching sections from DB
-            var matchingSectionIds = await ProductPlacementServices.GetSectionIdsForItemNumbersAsync(itemNumbers);
+            var matchingSectionIds = await ProductPlacementServices
+                .GetSectionIdsForItemNumbersAsync(itemNumbers);
+
             Console.WriteLine($"Found {matchingSectionIds?.Count ?? 0} matching sections");
 
             if (matchingSectionIds == null || matchingSectionIds.Count == 0)
@@ -582,11 +632,12 @@ namespace Winton.Views
                 return;
             }
 
-            // Highlight the matching sections visually
             HighlightSections(matchingSectionIds);
             RevenueOverlayCanvas.Children.Clear();
 
-            // Loop through each matching section and add a floating revenue box
+            // 🔥 IMPORTANT: Canvas must be click-through so section buttons work
+            RevenueOverlayCanvas.IsHitTestVisible = false;
+
             foreach (var sectionId in matchingSectionIds)
             {
                 if (string.IsNullOrWhiteSpace(sectionId))
@@ -603,7 +654,7 @@ namespace Winton.Views
 
                     Console.WriteLine($"✅ Revenue for section {sectionId}: {revenue:C0}");
 
-                    // Create the floating revenue box
+                    // 🔥 Revenue label (clickable element)
                     var border = new Border
                     {
                         Background = new SolidColorBrush(Color.FromArgb(220, 45, 45, 48)),
@@ -622,9 +673,11 @@ namespace Winton.Views
                         }
                     };
 
+                    // 🔥 KEY FIX: allow THIS element to receive clicks even though parent canvas is disabled
+                    border.IsHitTestVisible = true;
+
                     border.MouseLeftButtonUp += RevenueLabel_Click;
 
-                    // Try to locate the section shape on the canvas
                     var section = LiveFloorCanvas.Children
                         .OfType<FrameworkElement>()
                         .FirstOrDefault(el => el.Tag != null && el.Tag.ToString() == sectionId);
@@ -635,7 +688,7 @@ namespace Winton.Views
                         continue;
                     }
 
-                    // Convert coordinates from Viewbox-scaled canvas to overlay coordinates
+                    // Convert coordinates from live canvas to overlay canvas
                     Point relativeToCanvas = section.TranslatePoint(new Point(0, 0), LiveFloorCanvas);
                     Point screenPoint = LiveFloorCanvas.TranslatePoint(relativeToCanvas, RevenueOverlayCanvas);
 
@@ -654,6 +707,8 @@ namespace Winton.Views
                 }
             }
         }
+
+
 
         private async void RevenueLabel_Click(object sender, MouseButtonEventArgs e)
         {
@@ -731,27 +786,6 @@ namespace Winton.Views
             {
                 MessageBox.Show($"Error loading section details: {ex.Message}");
             }
-        }
-
-        private void ShowFilterPanel()
-        {
-            ProductPanel.Visibility = Visibility.Collapsed;
-            FilterPanel.Visibility = Visibility.Visible;
-
-        }
-
-        private void ShowProductPanel()
-        {
-            FilterPanel.Visibility = Visibility.Collapsed;
-            ProductPanel.Visibility = Visibility.Visible;
-
-        }
-
-        private void HidePanels()
-        {
-            FilterPanel.Visibility = Visibility.Collapsed;
-            ProductPanel.Visibility = Visibility.Collapsed;
-
         }
 
     }
