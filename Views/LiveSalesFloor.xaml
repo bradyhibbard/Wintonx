@@ -233,7 +233,7 @@
                       Background="Transparent"
                       Visibility="Collapsed"
                       IsHitTestVisible="False"
-                      Panel.ZIndex="50"/>
+                      Panel.ZIndex="55"/>
             </Grid>
 
         </Grid>
