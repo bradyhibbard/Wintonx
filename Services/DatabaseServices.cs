@@ -16,87 +16,99 @@ namespace Winton.Services
         {
             try
             {
-                bool dbJustCreated = !File.Exists(dbPath);
+                // Ensure the LocalAppData folder exists
+                Directory.CreateDirectory(Path.GetDirectoryName(DatabaseConfig.DbPath));
 
-                using (var connection = new SqliteConnection($"Data Source={dbPath};"))
+                // Detect legacy DB in the application folder (Program Files)
+                string legacyDbPath = Path.Combine(AppContext.BaseDirectory, "WintonDatabase.db");
+
+                // If new DB doesn't exist but the legacy one does, migrate it
+                if (!File.Exists(DatabaseConfig.DbPath) && File.Exists(legacyDbPath))
+                {
+                    File.Copy(legacyDbPath, DatabaseConfig.DbPath);
+                }
+
+                bool dbJustCreated = !File.Exists(DatabaseConfig.DbPath);
+
+                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
                 {
                     await connection.OpenAsync();
 
-                    // Drop old tables if they exist
+                    // Drop old unused tables
                     await DropTableIfExistsAsync(connection, "Furniture");
                     await DropTableIfExistsAsync(connection, "ProductPlacementHistory");
 
                     // Create tables
                     await CreateTableAsync(connection, "Sections", @"
-                        SectionID TEXT PRIMARY KEY,
-                        Name TEXT,
-                        XPosition REAL NOT NULL,
-                        YPosition REAL NOT NULL,
-                        Width REAL NOT NULL,
-                        Height REAL NOT NULL,
-                        Rotation REAL NOT NULL,
-                        ShapeType TEXT NOT NULL");
+                SectionID TEXT PRIMARY KEY,
+                Name TEXT,
+                XPosition REAL NOT NULL,
+                YPosition REAL NOT NULL,
+                Width REAL NOT NULL,
+                Height REAL NOT NULL,
+                Rotation REAL NOT NULL,
+                ShapeType TEXT NOT NULL");
 
                     await CreateTableAsync(connection, "Perimeter", @"
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        XPosition REAL NOT NULL,
-                        YPosition REAL NOT NULL");
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                XPosition REAL NOT NULL,
+                YPosition REAL NOT NULL");
 
                     await CreateTableAsync(connection, "Partitions", @"
-                        PartitionID TEXT NOT NULL,
-                        PointOrder INTEGER NOT NULL,
-                        XPosition REAL NOT NULL,
-                        YPosition REAL NOT NULL,
-                        PRIMARY KEY (PartitionID, PointOrder)");
+                PartitionID TEXT NOT NULL,
+                PointOrder INTEGER NOT NULL,
+                XPosition REAL NOT NULL,
+                YPosition REAL NOT NULL,
+                PRIMARY KEY (PartitionID, PointOrder)");
 
                     await CreateTableAsync(connection, "SalesData", @"
-                        SalesDataID INTEGER PRIMARY KEY AUTOINCREMENT,
-                        PlacementID INTEGER,
-                        ItemNumber TEXT,
-                        QuantitySold INTEGER,
-                        Revenue DECIMAL(10,2),
-                        SaleDate DATETIME,
-                        Grp TEXT,
-                        Cat TEXT,
-                        TransactionCode TEXT,
-                        Price DECIMAL(10,2),
-                        Description TEXT,
-                        VendorModel TEXT,
-                        FOREIGN KEY (PlacementID) REFERENCES ProductPlacements(PlacementID)");
+                SalesDataID INTEGER PRIMARY KEY AUTOINCREMENT,
+                PlacementID INTEGER,
+                ItemNumber TEXT,
+                QuantitySold INTEGER,
+                Revenue DECIMAL(10,2),
+                SaleDate DATETIME,
+                Grp TEXT,
+                Cat TEXT,
+                TransactionCode TEXT,
+                Price DECIMAL(10,2),
+                Description TEXT,
+                VendorModel TEXT,
+                FOREIGN KEY (PlacementID) REFERENCES ProductPlacements(PlacementID)");
 
                     await CreateTableAsync(connection, "Products", @"
-                        ProductID INTEGER PRIMARY KEY AUTOINCREMENT,
-                        ItemNumber TEXT NOT NULL UNIQUE,
-                        ItemName TEXT NOT NULL,
-                        Vendor TEXT,
-                        Category TEXT,
-                        Grp TEXT");
+                ProductID INTEGER PRIMARY KEY AUTOINCREMENT,
+                ItemNumber TEXT NOT NULL UNIQUE,
+                ItemName TEXT NOT NULL,
+                Vendor TEXT,
+                Category TEXT,
+                Grp TEXT");
 
                     await CreateTableAsync(connection, "ProductPlacements", @"
-                        PlacementID INTEGER PRIMARY KEY AUTOINCREMENT,
-                        ProductID INTEGER,
-                        SectionID TEXT,
-                        ItemNumber TEXT,
-                        QuantitySold INTEGER,
-                        Revenue DECIMAL(10,2),
-                        DatePlaced DATETIME,
-                        DateRemoved DATETIME,
-                        Cat TEXT,
-                        Grp TEXT,
-                        FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
-                        FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)");
+                PlacementID INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProductID INTEGER,
+                SectionID TEXT,
+                ItemNumber TEXT,
+                QuantitySold INTEGER,
+                Revenue DECIMAL(10,2),
+                DatePlaced DATETIME,
+                DateRemoved DATETIME,
+                Cat TEXT,
+                Grp TEXT,
+                FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
+                FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)");
 
                     await CreateTableAsync(connection, "Archive", @"
-                        PlacementID INTEGER PRIMARY KEY,
-                        ProductID INTEGER,
-                        SectionID TEXT,
-                        QuantitySold INTEGER,
-                        Revenue DECIMAL(10,2),
-                        DatePlaced DATETIME,
-                        DateRemoved DATETIME,
-                        RemovalNotes TEXT,
-                        FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
-                        FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)");
+                PlacementID INTEGER PRIMARY PRIMARY KEY,
+                ProductID INTEGER,
+                SectionID TEXT,
+                QuantitySold INTEGER,
+                Revenue DECIMAL(10,2),
+                DatePlaced DATETIME,
+                DateRemoved DATETIME,
+                RemovalNotes TEXT,
+                FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
+                FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)");
                 }
             }
             catch (Exception ex)
@@ -104,6 +116,7 @@ namespace Winton.Services
                 Console.WriteLine($"Database Initialization Error: {ex.Message}");
             }
         }
+
 
         public static async Task<string> BackupDatabaseAsync()
         {
