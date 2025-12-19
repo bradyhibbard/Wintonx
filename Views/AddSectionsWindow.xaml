@@ -1,60 +1,231 @@
 ﻿<Window x:Class="Winton.Views.AddSectionsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Add Section" Height="600" Width="300"
+        Title="Add Section"
+        Height="600"
+        Width="340"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#333">
-    <Grid>
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10">
-            <TextBlock Text="INSERT" HorizontalAlignment="Center" FontSize="16" Foreground="White" FontWeight="Bold" Margin="0,5"/>
+        Background="{DynamicResource SurfaceBackground}">
 
-            <!-- Shape Selection -->
-            <Button Content="Square" Background="Transparent" Foreground="White" Click="AddSquare_Click" Margin="5" Width="200"/>
-            <Button Content="Circle" Background="Transparent" Foreground="White" Click="AddCircle_Click" Margin="5" Width="200"/>
-            <Button Content="Triangle" Background="Transparent" Foreground="White" Click="AddTriangle_Click" Margin="5" Width="200"/>
+    <Window.Resources>
 
-            <!-- Dimension + Rotation Controls -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,10">
-                <!-- Width -->
-                <StackPanel Margin="5" Width="80">
-                    <TextBlock Text="Width" HorizontalAlignment="Center" FontSize="12" Foreground="White" FontWeight="Bold"/>
-                    <TextBox x:Name="WidthBox"
-                             Text="50"
-                             HorizontalContentAlignment="Center"
-                             PreviewTextInput="NumericOnly_PreviewTextInput"
-                             LostFocus="WidthBox_LostFocus"/>
+        <!-- Shape option selector (RadioButtons that look like your app buttons) -->
+        <!-- NOTE: If your accent brush key is named differently, change AccentBrush below to match. -->
+        <Style x:Key="ShapeOptionButtonStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}" />
+            <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Divider}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <!-- Hover -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBackground}" />
+                            </Trigger>
+
+                            <!-- Selected -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBackground}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <!-- Main Card -->
+        <Border Background="{DynamicResource CardBackground}"
+                BorderBrush="{DynamicResource Divider}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="18">
+
+            <Border.Effect>
+                <DropShadowEffect Color="#44000000"
+                                  BlurRadius="14"
+                                  ShadowDepth="3"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                    <TextBlock Text="Insert"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource PrimaryText}"/>
+                    <TextBlock Text="Choose a shape, then adjust size and rotation."
+                               Margin="0,6,0,0"
+                               Foreground="{DynamicResource SecondaryText}"
+                               FontSize="12"/>
                 </StackPanel>
 
-                <!-- Height -->
-                <StackPanel Margin="5" Width="80">
-                    <TextBlock Text="Height" HorizontalAlignment="Center" FontSize="12" Foreground="White" FontWeight="Bold"/>
-                    <TextBox x:Name="HeightBox"
-                             Text="50"
-                             HorizontalContentAlignment="Center"
-                             PreviewTextInput="NumericOnly_PreviewTextInput"
-                             LostFocus="HeightBox_LostFocus"/>
+                <!-- Shape Selection (default Square selected) -->
+                <StackPanel Grid.Row="1" Margin="0,0,0,14">
+                    <TextBlock Text="Shape"
+                               Foreground="{DynamicResource SecondaryText}"
+                               Margin="2,0,0,6"/>
+
+                    <RadioButton x:Name="SquareOption"
+                                 Content="Square"
+                                 GroupName="ShapeOptions"
+                                 IsChecked="True"
+                                 Checked="SquareOption_Checked"
+                                 Style="{StaticResource ShapeOptionButtonStyle}"
+                                 Margin="0,0,0,8"/>
+
+                    <RadioButton x:Name="CircleOption"
+                                 Content="Circle"
+                                 GroupName="ShapeOptions"
+                                 Checked="CircleOption_Checked"
+                                 Style="{StaticResource ShapeOptionButtonStyle}"
+                                 Margin="0,0,0,8"/>
+
+                    <RadioButton x:Name="TriangleOption"
+                                 Content="Triangle"
+                                 GroupName="ShapeOptions"
+                                 Checked="TriangleOption_Checked"
+                                 Style="{StaticResource ShapeOptionButtonStyle}"/>
                 </StackPanel>
 
-                <!-- Rotation -->
-                <StackPanel Margin="5" Width="80">
-                    <TextBlock Text="Rotation" HorizontalAlignment="Center" FontSize="12" Foreground="White" FontWeight="Bold"/>
-                    <TextBox x:Name="RotationBox"
-                             Text="0"
-                             HorizontalContentAlignment="Center"
-                             PreviewTextInput="NumericOnly_PreviewTextInput"
-                             LostFocus="RotationBox_LostFocus"/>
+                <!-- Dimension + Rotation Controls -->
+                <StackPanel Grid.Row="2" Margin="0,0,0,14">
+                    <TextBlock Text="Dimensions"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource PrimaryText}"
+                               Margin="0,0,0,10"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Width -->
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock Text="Width"
+                                       Foreground="{DynamicResource SecondaryText}"
+                                       FontSize="12"
+                                       Margin="0,0,0,6"
+                                       HorizontalAlignment="Center"/>
+                            <TextBox x:Name="WidthBox"
+                                     Text="50"
+                                     HorizontalContentAlignment="Center"
+                                     PreviewTextInput="NumericOnly_PreviewTextInput"
+                                     LostFocus="WidthBox_LostFocus"/>
+                        </StackPanel>
+
+                        <!-- Height -->
+                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                            <TextBlock Text="Height"
+                                       Foreground="{DynamicResource SecondaryText}"
+                                       FontSize="12"
+                                       Margin="0,0,0,6"
+                                       HorizontalAlignment="Center"/>
+                            <TextBox x:Name="HeightBox"
+                                     Text="50"
+                                     HorizontalContentAlignment="Center"
+                                     PreviewTextInput="NumericOnly_PreviewTextInput"
+                                     LostFocus="HeightBox_LostFocus"/>
+                        </StackPanel>
+
+                        <!-- Rotation -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Rotation"
+                                       Foreground="{DynamicResource SecondaryText}"
+                                       FontSize="12"
+                                       Margin="0,0,0,6"
+                                       HorizontalAlignment="Center"/>
+                            <TextBox x:Name="RotationBox"
+                                     Text="0"
+                                     HorizontalContentAlignment="Center"
+                                     PreviewTextInput="NumericOnly_PreviewTextInput"
+                                     LostFocus="RotationBox_LostFocus"/>
+                        </StackPanel>
+                    </Grid>
                 </StackPanel>
-            </StackPanel>
 
-            <!-- Shape Preview -->
-            <Border BorderThickness="1" BorderBrush="White" Height="100" Width="100" HorizontalAlignment="Center" Margin="10">
-                <Canvas x:Name="PreviewCanvas" Background="LightGray"/>
-            </Border>
+                <!-- Shape Preview -->
+                <StackPanel Grid.Row="3" Margin="0,0,0,14">
+                    <TextBlock Text="Preview"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource PrimaryText}"
+                               Margin="0,0,0,10"/>
 
-            <!-- Action Buttons -->
-            <Button Content="Apply" Click="ApplyShape_Click" Margin="0,5,0,2" Width="200" Background="White" Foreground="Black"/>
-            <Button Content="Close" Click="CloseWindow_Click" Margin="10,5,10,5" Width="200" Background="White" Foreground="Red"/>
-        </StackPanel>
+                    <Border BorderThickness="1"
+                            BorderBrush="{DynamicResource Divider}"
+                            CornerRadius="10"
+                            Height="130"
+                            Padding="10"
+                            Background="{DynamicResource SurfaceBackground}">
+                        <Canvas x:Name="PreviewCanvas"
+                                Background="Transparent"/>
+                    </Border>
+                </StackPanel>
+
+                <!-- Spacer -->
+                <Grid Grid.Row="4"/>
+
+                <!-- Action Buttons -->
+                <Grid Grid.Row="5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0"
+                            Content="Apply"
+                            Style="{StaticResource NavButton}"
+                            Click="ApplyShape_Click"
+                            Padding="12,8"/>
+
+                    <Button Grid.Column="2"
+                            Content="Close"
+                            Style="{StaticResource NavButton}"
+                            Click="CloseWindow_Click"
+                            Padding="12,8"/>
+                </Grid>
+
+            </Grid>
+        </Border>
     </Grid>
 </Window>
