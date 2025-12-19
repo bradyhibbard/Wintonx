@@ -133,6 +133,9 @@ namespace Winton.Views
 
         private void ToggleProductPanel(bool open)
         {
+            if(open && _isFilterPanelOpen)
+                ToggleFilterPanel(false);
+
             _isProductPanelOpen = open;
             AnimatePanel(ProductPanelColumn, ProductPanel, open, _productPanelWidth);
         }
@@ -165,6 +168,9 @@ namespace Winton.Views
 
         private void ToggleFilterPanel(bool open)
         {
+            if (open && _isProductPanelOpen)
+                ToggleProductPanel(false);
+
             _isFilterPanelOpen = open;
 
             GridLengthAnimation animation = new GridLengthAnimation
@@ -583,32 +589,49 @@ namespace Winton.Views
         {
             Console.WriteLine("HighlightForFilteredProductsAsync triggered");
 
+            // If the section detail overlay is open, don't draw / intercept anything underneath.
+            if (SectionDetailOverlay.Visibility == Visibility.Visible)
+            {
+                RevenueOverlayCanvas.Children.Clear();
+                RevenueOverlayCanvas.IsHitTestVisible = false;
+                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
+                return;
+            }
+
             var vendorInput = VendorTextBox.Text?.Trim();
             var categoryInput = CategoryTextBox.Text?.Trim();
             var groupInput = GroupTextBox.Text?.Trim();
             var productInput = ProductTextBox.Text?.Trim();
 
-            bool anyInput = !(string.IsNullOrEmpty(vendorInput) &&
-                              string.IsNullOrEmpty(categoryInput) &&
-                              string.IsNullOrEmpty(groupInput) &&
-                              string.IsNullOrEmpty(productInput));
+            bool anyInput = !(string.IsNullOrWhiteSpace(vendorInput) &&
+                              string.IsNullOrWhiteSpace(categoryInput) &&
+                              string.IsNullOrWhiteSpace(groupInput) &&
+                              string.IsNullOrWhiteSpace(productInput));
 
             if (!anyInput)
             {
                 ClearHighlights();
+
                 RevenueOverlayCanvas.Children.Clear();
+                RevenueOverlayCanvas.IsHitTestVisible = false;
+                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
+
                 return;
             }
 
             if (filteredProducts == null || filteredProducts.Count == 0)
             {
                 DimAllSections_NoResults();
+
                 RevenueOverlayCanvas.Children.Clear();
+                RevenueOverlayCanvas.IsHitTestVisible = false;
+                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
+
                 return;
             }
 
             var itemNumbers = filteredProducts
-                .Select(p => p.ItemNumber)
+                .Select(p => p?.ItemNumber)
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -616,45 +639,49 @@ namespace Winton.Views
             if (itemNumbers.Count == 0)
             {
                 DimAllSections_NoResults();
+
                 RevenueOverlayCanvas.Children.Clear();
+                RevenueOverlayCanvas.IsHitTestVisible = false;
+                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
+
                 return;
             }
 
-            var matchingSectionIds = await ProductPlacementServices
-                .GetSectionIdsForItemNumbersAsync(itemNumbers);
+            var matchingSectionIds = await ProductPlacementServices.GetSectionIdsForItemNumbersAsync(itemNumbers);
 
             Console.WriteLine($"Found {matchingSectionIds?.Count ?? 0} matching sections");
 
             if (matchingSectionIds == null || matchingSectionIds.Count == 0)
             {
                 DimAllSections_NoResults();
+
                 RevenueOverlayCanvas.Children.Clear();
+                RevenueOverlayCanvas.IsHitTestVisible = false;
+                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
+
                 return;
             }
 
             HighlightSections(matchingSectionIds);
-            RevenueOverlayCanvas.Children.Clear();
 
-            // 🔥 IMPORTANT: Canvas must be click-through so section buttons work
-            RevenueOverlayCanvas.IsHitTestVisible = false;
+            // Prepare overlay for clickable labels
+            RevenueOverlayCanvas.Children.Clear();
+            RevenueOverlayCanvas.Visibility = Visibility.Visible;
+            RevenueOverlayCanvas.IsHitTestVisible = true;
 
             foreach (var sectionId in matchingSectionIds)
             {
                 if (string.IsNullOrWhiteSpace(sectionId))
-                {
-                    Console.WriteLine("⚠️ Skipping null or empty sectionId");
                     continue;
-                }
 
                 try
                 {
                     DateTime startDate = DateTime.Now.AddMonths(-1);
                     DateTime endDate = DateTime.Now;
+
                     decimal revenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, startDate, endDate);
 
-                    Console.WriteLine($"✅ Revenue for section {sectionId}: {revenue:C0}");
-
-                    // 🔥 Revenue label (clickable element)
+                    // Create the clickable revenue label
                     var border = new Border
                     {
                         Background = new SolidColorBrush(Color.FromArgb(220, 45, 45, 48)),
@@ -664,6 +691,7 @@ namespace Winton.Views
                         Padding = new Thickness(6),
                         Tag = sectionId,
                         Cursor = Cursors.Hand,
+                        IsHitTestVisible = true,
                         Child = new TextBlock
                         {
                             Text = $"Revenue: {revenue:C0}",
@@ -673,75 +701,81 @@ namespace Winton.Views
                         }
                     };
 
-                    // 🔥 KEY FIX: allow THIS element to receive clicks even though parent canvas is disabled
-                    border.IsHitTestVisible = true;
-
                     border.MouseLeftButtonUp += RevenueLabel_Click;
 
-                    var section = LiveFloorCanvas.Children
+                    // Find the UI element for the section so we can position the label near it
+                    var sectionElement = LiveFloorCanvas.Children
                         .OfType<FrameworkElement>()
-                        .FirstOrDefault(el => el.Tag != null && el.Tag.ToString() == sectionId);
+                        .FirstOrDefault(el => el.Tag != null &&
+                                              string.Equals(el.Tag.ToString(), sectionId, StringComparison.OrdinalIgnoreCase));
 
-                    if (section == null)
-                    {
-                        Console.WriteLine($"❌ No UI element found for sectionId: {sectionId}");
+                    if (sectionElement == null)
                         continue;
-                    }
 
                     // Convert coordinates from live canvas to overlay canvas
-                    Point relativeToCanvas = section.TranslatePoint(new Point(0, 0), LiveFloorCanvas);
-                    Point screenPoint = LiveFloorCanvas.TranslatePoint(relativeToCanvas, RevenueOverlayCanvas);
+                    Point relativeToLive = sectionElement.TranslatePoint(new Point(0, 0), LiveFloorCanvas);
+                    Point relativeToOverlay = LiveFloorCanvas.TranslatePoint(relativeToLive, RevenueOverlayCanvas);
 
-                    double labelX = screenPoint.X + (section.RenderSize.Width / 2) - 40;
-                    double labelY = screenPoint.Y - 30;
+                    double labelX = relativeToOverlay.X + (sectionElement.RenderSize.Width / 2) - 40;
+                    double labelY = relativeToOverlay.Y - 30;
 
                     Canvas.SetLeft(border, labelX);
                     Canvas.SetTop(border, labelY);
-                    RevenueOverlayCanvas.Children.Add(border);
 
-                    Console.WriteLine($"✅ Added overlay for {sectionId} at ({labelX}, {labelY})");
+                    RevenueOverlayCanvas.Children.Add(border);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"💥 Error adding overlay for sectionId {sectionId}: {ex.Message}");
+                    Console.WriteLine($"Error adding overlay for sectionId {sectionId}: {ex.Message}");
                 }
             }
         }
 
 
 
+        // LiveSalesFloor.xaml.cs
         private async void RevenueLabel_Click(object sender, MouseButtonEventArgs e)
         {
-            if (sender is not Border border || border.Tag is not string sectionId)
+            e.Handled = true;
+
+            if (sender is not Border border || border.Tag is not string sectionId || string.IsNullOrWhiteSpace(sectionId))
                 return;
 
             try
             {
-                // --- Load section and date info ---
+                // ✅ IMPORTANT: Once we open SectionDetail, the revenue overlay must NOT block clicks
+                RevenueOverlayCanvas.IsHitTestVisible = false;
+                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
+
+                // --- Load section + date range ---
                 DateTime startDate = DateTime.Now.AddMonths(-1);
                 DateTime endDate = DateTime.Now;
 
-                // --- Get section name ---
+                // --- Get section name (safe) ---
                 var sections = await CanvasService.LoadSectionsAsync();
                 var section = sections.FirstOrDefault(s => s.sectionId == sectionId);
 
-                // --- Get revenue + breakdown ---
-                decimal totalRevenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, startDate, endDate);
-                var products = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
-                var archived = await ProductPlacementServices.GetArchivedProductsBySectionAsync(sectionId);
+                string sectionName =
+                    (section == default) ? sectionId :
+                    (string.IsNullOrWhiteSpace(section.name) ? sectionId : section.name);
 
-                // --- Merge product lists ---
-                var productBreakdown = products
+                // --- Revenue + product breakdown ---
+                decimal totalRevenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, startDate, endDate);
+
+                var activeProducts = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
+                var archivedProducts = await ProductPlacementServices.GetArchivedProductsBySectionAsync(sectionId);
+
+                var productBreakdown = activeProducts
                     .Select(p => new ProductBreakdownItem
                     {
                         ItemNumber = p.ItemNumber,
-                        ProductName = p.ItemNumber, // replace with lookup if needed
+                        ProductName = p.ItemNumber,
                         QuantitySold = p.QuantitySold,
                         Revenue = p.Revenue,
                         IsActive = true,
                         DatePlaced = p.DatePlaced
                     })
-                    .Concat(archived.Select(a => new ProductBreakdownItem
+                    .Concat(archivedProducts.Select(a => new ProductBreakdownItem
                     {
                         ItemNumber = a.ItemNumber,
                         ProductName = a.ItemNumber,
@@ -755,13 +789,11 @@ namespace Winton.Views
                 int totalQty = productBreakdown.Sum(p => p.QuantitySold);
                 var topProduct = productBreakdown.OrderByDescending(p => p.Revenue).FirstOrDefault();
 
-                // --- Create ViewModel ---
+                // --- Build VM ---
                 var vm = new SectionDetailViewModel
                 {
                     SectionId = sectionId,
-                    SectionName = string.IsNullOrWhiteSpace(section.name)
-                    ? sectionId
-                    : section.name,
+                    SectionName = sectionName,
                     StartDate = startDate,
                     EndDate = endDate,
                     TotalRevenue = totalRevenue,
@@ -771,15 +803,19 @@ namespace Winton.Views
                     ProductBreakdown = productBreakdown
                 };
 
-                // --- Load chart data (we’ll implement these soon) ---
+                // Optional chart loads
                 vm.DailyTrendline = await ChartDataFactory.CreateDailyTrendlineAsync(sectionId, startDate, endDate);
                 vm.TopProductsBarChart = await ChartDataFactory.CreateTopProductsBarAsync(sectionId, startDate, endDate);
                 vm.SectionVsStoreComparison = await ChartDataFactory.CreateSectionVsStoreComparisonAsync(sectionId, startDate, endDate);
 
-                // --- Create and show overlay ---
+                // --- Show overlay ---
                 SectionDetailOverlay.Children.Clear();
-                var detailControl = new SectionDetail(vm);
-                SectionDetailOverlay.Children.Add(detailControl);
+                SectionDetailOverlay.Children.Add(new SectionDetail(vm));
+
+                // ✅ Make sure it’s above anything else
+                Panel.SetZIndex(SectionDetailOverlay, 9999);
+
+                SectionDetailOverlay.IsHitTestVisible = true;
                 SectionDetailOverlay.Visibility = Visibility.Visible;
             }
             catch (Exception ex)
@@ -787,6 +823,9 @@ namespace Winton.Views
                 MessageBox.Show($"Error loading section details: {ex.Message}");
             }
         }
+
+
+
 
     }
 }

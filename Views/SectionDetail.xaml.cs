@@ -15,10 +15,20 @@ namespace Winton.Views
             DataContext = ViewModel;
         }
 
+        public event EventHandler Closed;
+
         private void Close_Click(object sender, RoutedEventArgs e)
         {
-            if (Parent is Grid parentGrid)
-                parentGrid.Visibility = Visibility.Collapsed;
+            Closed?.Invoke(this, EventArgs.Empty);
+
+            if (Parent is Panel panel)
+            {
+                panel.Children.Clear();
+                panel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            Visibility = Visibility.Collapsed;
         }
 
     }
