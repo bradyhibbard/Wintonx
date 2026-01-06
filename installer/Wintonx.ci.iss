@@ -29,6 +29,12 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
 DisableDirPage=no
 WizardStyle=modern
+SetupIconFile=Assets\Wintonx.ico
+UninstallDisplayIcon={app}\Wintonx.exe
+WizardImageFile=Assets\Installer\WizardImage.bmp
+WizardSmallImageFile=Assets\Installer\WizardSmallImage.bmp
+
+
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
