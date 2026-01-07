@@ -75,6 +75,7 @@ namespace Winton
             }
         }
 
+        //adding a comment for testing git
         private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2 && e.ChangedButton == MouseButton.Left)
