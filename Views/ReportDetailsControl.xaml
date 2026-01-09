@@ -3,47 +3,139 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             mc:Ignorable="d" >
+             mc:Ignorable="d">
 
-	<Grid Margin="20">
-			<!-- Add Delete Button -->
+    <Grid Background="{DynamicResource SurfaceBackground}"
+          Margin="20">
 
-			<ListView x:Name="lstReportDetails" Margin="6,3,14,75" Background="#333333" Foreground="White">
-				<ListView.Resources>
-					<!-- Style for ListViewItem -->
-					<Style TargetType="ListViewItem">
-						<Setter Property="Background" Value="#333333" />
-						<Setter Property="Foreground" Value="White" />
-						<Setter Property="BorderThickness" Value="0"/>
-						<Setter Property="HorizontalContentAlignment" Value="Stretch" />
-						<Setter Property="Padding" Value="10,5" />
-						<Setter Property="FontSize" Value="14"/>
-						<Style.Triggers>
-							<Trigger Property="IsSelected" Value="True">
-								<Setter Property="Background" Value="#444444" />
-								<!-- Change background color when selected -->
-								<Setter Property="Foreground" Value="White" />
-							</Trigger>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter Property="Background" Value="#555555" />
-								<!-- Change background color on hover -->
-								<Setter Property="Foreground" Value="White" />
-							</Trigger>
-						</Style.Triggers>
-					</Style>
-				</ListView.Resources>
-				<!-- Define your list view columns here -->
-				<ListView.View>
-					<GridView>
-						<GridViewColumn Header="Item Number" DisplayMemberBinding="{Binding ItemNumber}" Width="150"/>
-						<GridViewColumn Header="Quantity Sold" DisplayMemberBinding="{Binding QuantitySold}" Width="100"/>
-						<GridViewColumn Header="Revenue" DisplayMemberBinding="{Binding Revenue}" Width="150"/>
-						<GridViewColumn Header="Description" DisplayMemberBinding="{Binding Description}" Width="200"/>
-						<GridViewColumn Header="Transaction Code" DisplayMemberBinding="{Binding TransactionCode}" Width="100"/>
-					</GridView>
-				</ListView.View>
-			</ListView>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-			<Button Content="Delete Report" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6,0,0,5" Width="108" Click="DeleteReport_Click" Height="46" Background="Transparent" Foreground="White"/>
-			</Grid>
+        <!-- ===============================
+             REPORT DETAILS CARD
+        =============================== -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource CardBackground}"
+                CornerRadius="10"
+                Padding="12">
+
+            <ListView x:Name="lstReportDetails"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="{DynamicResource PrimaryText}"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+
+                <ListView.Resources>
+
+                    <!-- List Items -->
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Padding" Value="6"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="6">
+                                        <ContentPresenter />
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#2AFFFFFF"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+
+                    <!-- Column Headers -->
+                    <Style TargetType="GridViewColumnHeader">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Foreground" Value="{DynamicResource SecondaryText}"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="Padding" Value="6,4"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource Divider}"/>
+                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                    </Style>
+
+                </ListView.Resources>
+
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Item Number"
+                                        DisplayMemberBinding="{Binding ItemNumber}"
+                                        Width="150"/>
+                        <GridViewColumn Header="Quantity Sold"
+                                        DisplayMemberBinding="{Binding QuantitySold}"
+                                        Width="120"/>
+                        <GridViewColumn Header="Revenue"
+                                        DisplayMemberBinding="{Binding Revenue}"
+                                        Width="140"/>
+                        <GridViewColumn Header="Description"
+                                        DisplayMemberBinding="{Binding Description}"
+                                        Width="220"/>
+                        <GridViewColumn Header="Transaction Code"
+                                        DisplayMemberBinding="{Binding TransactionCode}"
+                                        Width="140"/>
+                    </GridView>
+                </ListView.View>
+
+            </ListView>
+        </Border>
+        <!-- ===============================
+     ACTION BUTTONS (MATCH THEME)
+=============================== -->
+        <StackPanel Grid.Row="1"
+            Orientation="Horizontal"
+            HorizontalAlignment="Center"
+            Margin="0,18,0,0">
+
+            <!-- Delete Report -->
+            <Button Content="Delete Sales Report"
+            Width="180"
+            Height="44"
+            FontSize="14"
+            FontWeight="SemiBold"
+            Background="Transparent"
+            Foreground="{DynamicResource PrimaryText}"
+            BorderThickness="0"
+            Cursor="Hand"
+            Margin="12,0"
+            Click="DeleteReport_Click">
+
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                        Background="Transparent"
+                        CornerRadius="8"
+                        Padding="12,6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border"
+                                Property="Background"
+                                Value="#1AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border"
+                                Property="Background"
+                                Value="#2AFFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+
+            </Button>
+
+        </StackPanel>
+
+    </Grid>
 </UserControl>
