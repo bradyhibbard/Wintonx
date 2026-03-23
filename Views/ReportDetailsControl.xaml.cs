@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Diagnostics;
+using System.Windows;
 using System.Windows.Controls;
 using Winton.Services;
 
@@ -30,7 +31,7 @@ namespace Winton.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] LoadReportDetailsAsync: {ex.Message}");
+                Debug.WriteLine($"[ReportDetailsControl] LoadReportDetailsAsync: {ex}");
             }
         }
 

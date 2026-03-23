@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -254,7 +255,7 @@ namespace Winton.Views
             {
                 if (Owner is not MainWindow mainWin)
                 {
-                    Console.WriteLine("ERROR: Owner window not found.");
+                    Debug.WriteLine("ERROR: Owner window not found.");
                     return;
                 }
 
@@ -335,7 +336,7 @@ namespace Winton.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"ERROR in ApplyShape_Click: {ex}");
+                Debug.WriteLine($"ERROR in ApplyShape_Click: {ex}");
                 MessageBox.Show($"Apply failed: {ex.Message}");
             }
         }

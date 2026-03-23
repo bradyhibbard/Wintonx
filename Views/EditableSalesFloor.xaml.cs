@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -29,7 +30,7 @@ namespace Winton.Views
         private bool _isSectionsPanelVisible = false;
         private bool _isEditMode = false;
         private bool _hasUnsavedChanges = false;
-        public bool _isMoveSave = false;
+        public bool IsMoveSave { get; set; }
         private bool _isClearingCanvas = false;
         private Section _copiedSection;
 
@@ -158,13 +159,13 @@ namespace Winton.Views
         public void CopySelectedSection()
         {
             CopySelectedShape();
-            Console.WriteLine("[Copy] buffer set? " + (_copyBuffer != null));
+            Debug.WriteLine("[EditableSalesFloor] Copy buffer set? " + (_copyBuffer != null));
         }
         public async Task PasteCopiedSectionAsync()
         {
-            Console.WriteLine("[Paste] can paste? " + (_copyBuffer != null));
+            Debug.WriteLine("[EditableSalesFloor] Paste requested, buffer set? " + (_copyBuffer != null));
             await PasteCopiedShapeAsync();
-            Console.WriteLine("[Paste] requested AddShapeToCanvasAsync()");
+            Debug.WriteLine("[EditableSalesFloor] Paste: AddShapeToCanvasAsync() called.");
         }
 
 
@@ -420,7 +421,7 @@ namespace Winton.Views
 
             // Clear the canvas
             ClearSectionsFromCanvas();
-            Console.WriteLine("Canvas cleared upon exit.");
+            Debug.WriteLine("[EditableSalesFloor] Canvas cleared upon exit.");
         }
 
 
@@ -473,7 +474,7 @@ namespace Winton.Views
                     if (!string.IsNullOrEmpty(sectionId))
                     {
                         await CanvasService.UpdateSectionDimensionsAsync(sectionId, x, y, width, height, rotation);
-                        Console.WriteLine($"Section Saved - ID: {sectionId} X: {x}, Y: {y}");
+                        Debug.WriteLine($"[EditableSalesFloor] Section saved - ID: {sectionId} X: {x}, Y: {y}");
                     }
                 }
 
@@ -507,19 +508,19 @@ namespace Winton.Views
 
         private async void ExitEditMode_Click(object sender, RoutedEventArgs e)
         {
-            Console.WriteLine("Exiting Edit Mode...");
+            Debug.WriteLine("[EditableSalesFloor] Exiting Edit Mode...");
 
             // 1. Save changes
             if (_hasUnsavedChanges)
             {
                 await SaveChangesAsync();
-                Console.WriteLine("Changes saved.");
+                Debug.WriteLine("[EditableSalesFloor] Changes saved.");
             }
 
             // 2. Turn off partition drawing mode if active
             if (_isDrawingPartition)
             {
-                Console.WriteLine("Turning off partition drawing mode...");
+                Debug.WriteLine("[EditableSalesFloor] Turning off partition drawing mode...");
                 FloorDesign_Click(null, null);
             }
 
@@ -537,7 +538,7 @@ namespace Winton.Views
                 editButton.Content = "Enable Edit Mode";
             }
 
-            Console.WriteLine("Edit Mode disabled and button text updated.");
+            Debug.WriteLine("[EditableSalesFloor] Edit Mode disabled and button text updated.");
         }
 
 
@@ -713,7 +714,7 @@ namespace Winton.Views
                                 _deletedPartitionIds.Add(removedPartition.Id);
 
                             await CanvasService.DeletePartitionAsync(removedPartition.Id);
-                            Console.WriteLine($"Partition {removedPartition.Id} deleted via Delete key.");
+                            Debug.WriteLine($"[EditableSalesFloor] Partition {removedPartition.Id} deleted via Delete key.");
                         }
                     }
                 }
@@ -1059,7 +1060,7 @@ namespace Winton.Views
                     {
                         _deletedPartitionIds.Add(partitionToRemove.Id);
                         await CanvasService.DeletePartitionAsync(partitionToRemove.Id);
-                        Console.WriteLine($"Partition {partitionToRemove.Id} deleted via Ctrl+Z.");
+                        Debug.WriteLine($"[EditableSalesFloor] Partition {partitionToRemove.Id} deleted via Ctrl+Z.");
                     }
                 }
             }
@@ -1142,7 +1143,7 @@ namespace Winton.Views
         {
 
             var sections = await CanvasService.LoadSectionsAsync();
-            Console.WriteLine($"Loading {sections.Count} sections from the database.");
+            Debug.WriteLine($"[EditableSalesFloor] Loading {sections.Count} sections from the database.");
 
             foreach (var section in sections)
             {

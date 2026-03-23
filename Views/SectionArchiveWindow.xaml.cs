@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -36,7 +37,7 @@ namespace Winton.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading archive data: {ex.Message}");
+                Debug.WriteLine($"[SectionArchiveWindow] LoadArchiveData: {ex}");
             }
         }
 
@@ -45,14 +46,8 @@ namespace Winton.Views
         {
             var selectedItem = ArchiveListBox.SelectedItem;
 
-            if (selectedItem != null)
-            {
-                Console.WriteLine($"Selected Item Type: {selectedItem.GetType()}");
-            }
-
             if (selectedItem is ProductPlacement placement)
             {
-                Console.WriteLine($"Selected Item: {placement.ItemNumber}");
                 DateAddedPicker.SelectedDate = placement.DatePlaced;
                 DateRemovedPicker.SelectedDate = placement.DateRemoved ?? (DateTime?)null;
             }
@@ -92,7 +87,7 @@ namespace Winton.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error refreshing archive data: {ex.Message}");
+                Debug.WriteLine($"[SectionArchiveWindow] RefreshArchiveData: {ex}");
             }
         }
 
@@ -127,7 +122,7 @@ namespace Winton.Views
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error updating dates: {ex.Message}");
+                    Debug.WriteLine($"[SectionArchiveWindow] SaveDatesButton_Click: {ex}");
                 }
             }
         }

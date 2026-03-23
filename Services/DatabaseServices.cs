@@ -98,6 +98,7 @@ namespace Winton.Services
                 PlacementID INTEGER PRIMARY KEY,
                 ProductID INTEGER,
                 SectionID TEXT,
+                ItemNumber TEXT,
                 QuantitySold INTEGER,
                 Revenue DECIMAL(10,2),
                 DatePlaced DATETIME,

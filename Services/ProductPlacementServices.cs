@@ -612,16 +612,7 @@ namespace Winton.Services
           AND ItemNumber IN ({string.Join(",", paramNames)})
     ";
 
-            // Use the same DB path pattern as DatabaseService
-            var dbPathField = typeof(DatabaseService)
-                .GetField("dbPath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-
-            if (dbPathField == null)
-                return ids;
-
-            var dbPath = (string)dbPathField.GetValue(null);
-
-            using (var connection = new SqliteConnection($"Data Source={dbPath};"))
+            using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
             {
                 await connection.OpenAsync();
                 using (var cmd = new SqliteCommand(sql, connection))
