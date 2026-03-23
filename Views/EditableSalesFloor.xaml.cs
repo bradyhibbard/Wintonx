@@ -132,8 +132,6 @@ namespace Winton.Views
 
         private void InitializeCanvas()
         {
-            Console.WriteLine("Reinitializing canvas elements...");
-
             DrawGrid();
 
             // Check and re-add the perimeter line only if it is not already in the canvas
@@ -141,8 +139,6 @@ namespace Winton.Views
             {
                 SalesFloorCanvas.Children.Add(_perimeterLine);
             }
-
-            Console.WriteLine("Canvas reinitialized.");
         }
 
         private static string GetShapeTypeFromShape(Shape s)

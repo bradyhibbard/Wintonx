@@ -1,6 +1,6 @@
-﻿using NPOI.SS.UserModel.Charts;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -9,7 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
-using System.Windows.Threading;      // ✅ For DispatcherTimer
+using System.Windows.Threading;
 using Winton.Helpers;
 using Winton.Models;
 using Winton.Services;
@@ -27,6 +27,7 @@ namespace Winton.Views
         private double _productPanelWidth => ActualWidth * 0.3;
         private SectionManager _sectionManager;
         private Polyline _perimeterLine = new Polyline { Stroke = Brushes.Black, StrokeThickness = 2 };
+        private Action<string> _sectionSelectedHandler;
 
         // ✅ Debounce timers for filters
         private DispatcherTimer _filterPanelDebounceTimer;
@@ -37,12 +38,15 @@ namespace Winton.Views
             InitializeComponent();
             _sectionManager = new SectionManager(LiveFloorCanvas, this);
             Loaded += LiveSalesFloor_Loaded;
+            Unloaded += LiveSalesFloor_Unloaded;
 
-            // Subscribe to the SectionSelected event.
-            _sectionManager.SectionSelected += async (sectionId) =>
-            {
-                await LoadSectionDetails(sectionId);
-            };
+            _sectionSelectedHandler = async sectionId => await LoadSectionDetails(sectionId);
+            _sectionManager.SectionSelected += _sectionSelectedHandler;
+        }
+
+        private void LiveSalesFloor_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _sectionManager.SectionSelected -= _sectionSelectedHandler;
         }
 
         private async void LiveSalesFloor_Loaded(object sender, RoutedEventArgs e)
@@ -76,12 +80,8 @@ namespace Winton.Views
 
                 if (button != null)
                 {
-                    button.Focusable = true;  // Ensure the button can receive focus
+                    button.Focusable = true;
                     button.PreviewMouseDoubleClick += Section_MouseDoubleClick;
-
-
-                    // Add a debug log to verify the event is attached
-                    Console.WriteLine($"DoubleClick event attached to section {section.sectionId}");
                 }
             }
         }
@@ -393,7 +393,7 @@ namespace Winton.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading products for section {sectionId}: {ex.Message}");
+                Debug.WriteLine($"[LiveSalesFloor] LoadAddedProducts: {ex}");
             }
         }
 
@@ -406,11 +406,11 @@ namespace Winton.Views
                 try
                 {
                     await CanvasService.UpdateSectionNameAsync(_currentSectionId, newName);
-                    Console.WriteLine($"Section ID updated to: {newName}");
+                    Debug.WriteLine($"[LiveSalesFloor] Section name updated to: {newName}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error updating Section ID: {ex.Message}");
+                    Debug.WriteLine($"[LiveSalesFloor] UpdateSectionName: {ex}");
                 }
             }
         }
@@ -466,7 +466,7 @@ namespace Winton.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error removing and archiving products: {ex.Message}");
+                Debug.WriteLine($"[LiveSalesFloor] RemoveProductButton_Click: {ex}");
             }
         }
 
@@ -483,11 +483,11 @@ namespace Winton.Views
                     try
                     {
                         await ProductPlacementServices.UpdateDatePlacedAsync(productPlacement.ProductID, _currentSectionId, newDateAdded);
-                        Console.WriteLine($"Date Added updated for {itemNumber}: {newDateAdded}");
+                        Debug.WriteLine($"[LiveSalesFloor] DateAdded updated for {itemNumber}: {newDateAdded}");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error updating Date Added: {ex.Message}");
+                        Debug.WriteLine($"[LiveSalesFloor] UpdateDateAdded: {ex}");
                     }
                 }
             }
@@ -587,7 +587,6 @@ namespace Winton.Views
 
         private async Task HighlightForFilteredProductsAsync(List<Product> filteredProducts)
         {
-            Console.WriteLine("HighlightForFilteredProductsAsync triggered");
 
             // If the section detail overlay is open, don't draw / intercept anything underneath.
             if (SectionDetailOverlay.Visibility == Visibility.Visible)
@@ -649,7 +648,7 @@ namespace Winton.Views
 
             var matchingSectionIds = await ProductPlacementServices.GetSectionIdsForItemNumbersAsync(itemNumbers);
 
-            Console.WriteLine($"Found {matchingSectionIds?.Count ?? 0} matching sections");
+            Debug.WriteLine($"[LiveSalesFloor] Found {matchingSectionIds?.Count ?? 0} matching sections");
 
             if (matchingSectionIds == null || matchingSectionIds.Count == 0)
             {
@@ -726,7 +725,7 @@ namespace Winton.Views
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error adding overlay for sectionId {sectionId}: {ex.Message}");
+                    Debug.WriteLine($"[LiveSalesFloor] Overlay for section {sectionId}: {ex}");
                 }
             }
         }

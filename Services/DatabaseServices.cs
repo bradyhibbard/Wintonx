@@ -1,10 +1,6 @@
-﻿using DocumentFormat.OpenXml.Drawing.ChartDrawing;
-using DocumentFormat.OpenXml.Drawing.Charts;
-using DocumentFormat.OpenXml.Wordprocessing;
-using Microsoft.Data.Sqlite;
-using NPOI.SS.Formula.Functions;
+﻿using Microsoft.Data.Sqlite;
+using System.Diagnostics;
 using System.IO;
-using static NPOI.HSSF.Util.HSSFColor;
 
 namespace Winton.Services
 {
@@ -99,7 +95,7 @@ namespace Winton.Services
                 FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)");
 
                     await CreateTableAsync(connection, "Archive", @"
-                PlacementID INTEGER PRIMARY PRIMARY KEY,
+                PlacementID INTEGER PRIMARY KEY,
                 ProductID INTEGER,
                 SectionID TEXT,
                 QuantitySold INTEGER,
@@ -113,7 +109,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Database Initialization Error: {ex.Message}");
+                Debug.WriteLine($"Database Initialization Error: {ex}");
             }
         }
 

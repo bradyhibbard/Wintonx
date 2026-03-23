@@ -8,9 +8,8 @@ namespace Winton.Views
 {
     public partial class BugReport : UserControl
     {
-        private const string GitHubOwner = "bradyhibbard";  // Replace with your GitHub username or organization name
-        private const string GitHubRepo = "Winton";  // Replace with the name of your GitHub repository
-        private const string GitHubToken = "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";  // Replace with your GitHub Personal Access Token (keep it secure)
+        private const string GitHubOwner = "bradyhibbard";
+        private const string GitHubRepo = "Winton";
 
         public BugReport()
         {
@@ -48,7 +47,11 @@ namespace Winton.Views
             using (HttpClient client = new HttpClient())
             {
                 // Set up the request headers
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", GitHubToken);
+                string token = Environment.GetEnvironmentVariable("WINTON_GITHUB_TOKEN");
+                if (string.IsNullOrEmpty(token))
+                    return "GitHub token not configured. Set the WINTON_GITHUB_TOKEN environment variable.";
+
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", token);
                 client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("BugReportApp", "1.0"));
 
                 // Format the issue body with markdown for better readability

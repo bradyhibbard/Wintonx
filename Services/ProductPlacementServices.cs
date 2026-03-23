@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.Sqlite;
+using System.Diagnostics;
 using System.Windows;
 using Winton.Models;
 
@@ -19,8 +20,6 @@ namespace Winton.Services
         {
             try
             {
-                Console.WriteLine($"[DEBUG] PlaceProductAsync called with ItemNumber: {itemNumber}, SectionID: {sectionId}");
-
                 using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
                 {
                     await connection.OpenAsync();
@@ -39,8 +38,6 @@ namespace Winton.Services
                                 string grp = reader["Grp"].ToString();
                                 string cat = reader["Category"].ToString();
 
-                                Console.WriteLine($"[DEBUG] Found product: ProductID={productId}, Grp={grp}, Cat={cat}");
-
                                 // Insert a new product placement record
                                 query = @"
                             INSERT INTO ProductPlacements (ProductID, SectionID, ItemNumber, DatePlaced, Grp, Cat) 
@@ -54,20 +51,12 @@ namespace Winton.Services
                                     insertCommand.Parameters.AddWithValue("@Grp", grp);
                                     insertCommand.Parameters.AddWithValue("@Cat", cat);
 
-                                    int rowsAffected = await insertCommand.ExecuteNonQueryAsync();
-                                    if (rowsAffected > 0)
-                                    {
-                                        Console.WriteLine("[DEBUG] Product placement inserted successfully.");
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine("[DEBUG] Insert command executed, but no rows affected.");
-                                    }
+                                    await insertCommand.ExecuteNonQueryAsync();
                                 }
                             }
                             else
                             {
-                                Console.WriteLine($"[DEBUG] No matching product found in Products table for ItemNumber: {itemNumber}");
+                                Debug.WriteLine($"[ProductPlacementServices] No matching product found for ItemNumber: {itemNumber}");
                             }
                         }
                     }
@@ -75,7 +64,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] PlaceProductAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] PlaceProductAsync: {ex}");
             }
         }
 
@@ -111,7 +100,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] EnsureSectionExistsAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] EnsureSectionExistsAsync: {ex}");
             }
         }
 
@@ -138,7 +127,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] ProductExistsAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] ProductExistsAsync: {ex}");
                 return false;
             }
         }
@@ -200,7 +189,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetProductsBySectionAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] GetProductsBySectionAsync: {ex}");
             }
 
             return products;
@@ -245,7 +234,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetCurrentProductPlacementAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] GetCurrentProductPlacementAsync: {ex}");
             }
 
             return null;
@@ -292,7 +281,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetRevenueDataAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] GetRevenueDataAsync: {ex}");
             }
 
             return revenueData;
@@ -322,7 +311,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] RemoveProductFromSectionAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] RemoveProductFromSectionAsync: {ex}");
             }
         }
 
@@ -357,7 +346,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error archiving product placement: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] ArchiveProductPlacementAsync: {ex}");
             }
         }
 
@@ -480,7 +469,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error updating archive dates: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] UpdateArchiveDatesAsync: {ex}");
             }
         }
 
@@ -520,7 +509,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetPlacementByPlacementIdAsync: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] GetPlacementByPlacementIdAsync: {ex}");
             }
 
             return null;
@@ -545,22 +534,13 @@ namespace Winton.Services
                         command.Parameters.AddWithValue("@ProductID", productId);
                         command.Parameters.AddWithValue("@SectionID", sectionId);
 
-                        int rowsAffected = await command.ExecuteNonQueryAsync();
-
-                        if (rowsAffected > 0)
-                        {
-                            Console.WriteLine($"DatePlaced updated for ProductID {productId} in Section {sectionId} to {newDatePlaced}");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"No matching record found for ProductID {productId} in Section {sectionId}.");
-                        }
+                        await command.ExecuteNonQueryAsync();
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error updating DatePlaced: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] UpdateDatePlacedAsync: {ex}");
             }
         }
 
@@ -603,7 +583,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching archive data: {ex.Message}");
+                Debug.WriteLine($"[ProductPlacementServices] GetArchivedProductsBySectionAsync: {ex}");
             }
 
             return archivedProducts;

@@ -2,6 +2,7 @@
 using Microsoft.Data.Sqlite;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
+using System.Diagnostics;
 using System.IO;
 using Winton.Models;
 
@@ -53,7 +54,7 @@ namespace Winton.Services
                                     if (string.IsNullOrEmpty(itemNumber) || string.IsNullOrEmpty(transactionCode) ||
                                         !validPrice || !validQuantity)
                                     {
-                                        Console.WriteLine($"Skipping row {row}: Invalid data.");
+                                        Debug.WriteLine($"[ImportServices] Skipping row {row}: invalid data.");
                                         continue;
                                     }
 
@@ -68,7 +69,7 @@ namespace Winton.Services
 
                                     if (!validTransaction)
                                     {
-                                        Console.WriteLine($"Ignoring row {row}: Unsupported transaction code {transactionCode}.");
+                                        Debug.WriteLine($"[ImportServices] Ignoring row {row}: unsupported transaction code {transactionCode}.");
                                         continue;
                                     }
 
@@ -103,7 +104,7 @@ namespace Winton.Services
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"SQL Error on row {row}: {ex.Message}");
+                                    Debug.WriteLine($"[ImportServices] SQL error on row {row}: {ex}");
                                 }
                             }
 
@@ -112,11 +113,11 @@ namespace Winton.Services
                     }
                 }
 
-                Console.WriteLine("Sales report imported successfully.");
+                Debug.WriteLine("[ImportServices] Sales report imported successfully.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] ImportSalesReportAsync: {ex.Message}");
+                Debug.WriteLine($"[ImportServices] ImportSalesReportAsync: {ex}");
             }
         }
 
@@ -143,7 +144,7 @@ namespace Winton.Services
                 ISheet sheet = workbook.GetSheetAt(0);
                 if (sheet == null)
                 {
-                    Console.WriteLine("No sheet found in the Excel file.");
+                    Debug.WriteLine("[ImportServices] No sheet found in the Excel file.");
                     return;
                 }
 
@@ -151,7 +152,7 @@ namespace Winton.Services
                 IRow headerRow = sheet.GetRow(0);
                 if (headerRow == null)
                 {
-                    Console.WriteLine("Header row is missing or empty. Cannot import.");
+                    Debug.WriteLine("[ImportServices] Header row is missing or empty. Cannot import.");
                     return;
                 }
 
@@ -206,10 +207,14 @@ namespace Winton.Services
                         // We'll treat itemNumber as the same as vendorModel for now
                         string itemNumber = vendorModel;
 
+                        if (string.IsNullOrEmpty(itemNumber))
+                        {
+                            continue;
+                        }
+
                         // Validate numeric fields
                         if (!decimal.TryParse(priceStr, out decimal price) || !int.TryParse(quantityStr, out int quantity))
                         {
-                            Console.WriteLine($"Skipping row {rowIndex}: invalid price or quantity (Price={priceStr}, Qty={quantityStr}).");
                             continue;
                         }
 
@@ -217,7 +222,7 @@ namespace Winton.Services
                         var validCodes = new HashSet<string> { "00", "05", "07", "30", "37" };
                         if (string.IsNullOrEmpty(transactionCode) || !validCodes.Contains(transactionCode))
                         {
-                            Console.WriteLine($"Skipping row {rowIndex}: invalid or missing transaction code '{transactionCode}'.");
+                            Debug.WriteLine($"[ImportServices] Skipping row {rowIndex}: invalid transaction code '{transactionCode}'.");
                             continue;
                         }
 
@@ -246,16 +251,16 @@ namespace Winton.Services
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Row {rowIndex} error: {ex.Message}");
+                        Debug.WriteLine($"[ImportServices] Row {rowIndex} error: {ex}");
                     }
                 }
 
                 await transaction.CommitAsync();
-                Console.WriteLine("Import complete!");
+                Debug.WriteLine("[ImportServices] Import complete.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] ImportSalesReportWithMappingAsync: {ex.Message}");
+                Debug.WriteLine($"[ImportServices] ImportSalesReportWithMappingAsync: {ex}");
             }
         }
 
@@ -296,11 +301,11 @@ namespace Winton.Services
                     }
                 }
 
-                Console.WriteLine("Sales report entry deleted successfully.");
+                Debug.WriteLine("[ImportServices] Sales report entry deleted successfully.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] DeleteSalesReportAsync: {ex.Message}");
+                Debug.WriteLine($"[ImportServices] DeleteSalesReportAsync: {ex}");
             }
         }
 
@@ -399,7 +404,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error importing product list: {ex.Message}");
+                Debug.WriteLine($"[ImportServices] ImportProductListAsync: {ex}");
             }
         }
 
@@ -430,13 +435,13 @@ namespace Winton.Services
                             }
 
                             await transaction.CommitAsync();
-                            Console.WriteLine("All products deleted successfully.");
+                            Debug.WriteLine("[ImportServices] All products deleted successfully.");
                             return true;
                         }
                         catch (Exception ex)
                         {
                             await transaction.RollbackAsync();
-                            Console.WriteLine($"Error deleting products: {ex.Message}");
+                            Debug.WriteLine($"[ImportServices] DeleteAllProductsAsync: {ex}");
                             return false;
                         }
                     }
@@ -444,7 +449,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Database error: {ex.Message}");
+                Debug.WriteLine($"[ImportServices] DeleteAllProductsAsync (outer): {ex}");
                 return false;
             }
         }
