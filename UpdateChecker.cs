@@ -228,7 +228,7 @@ namespace Winton.Views
                 if (state?.LastCheckUtc is null) return true;
                 return (DateTime.UtcNow - state.LastCheckUtc.Value) > TimeSpan.FromDays(1);
             }
-            catch { return true; }
+            catch (Exception ex) { Debug.WriteLine($"[UpdateChecker] ShouldCheckToday failed: {ex.Message}"); return true; }
         }
 
         private static void SaveLastCheck()
@@ -239,7 +239,7 @@ namespace Winton.Views
                 var json = JsonSerializer.Serialize(new UpdateState(DateTime.UtcNow));
                 File.WriteAllText(StatePath, json);
             }
-            catch { /* noop */ }
+            catch (Exception ex) { Debug.WriteLine($"[UpdateChecker] SaveLastCheck failed: {ex.Message}"); }
         }
 
         private static void ShowInfo(string msg) =>

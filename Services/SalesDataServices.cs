@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using LiveCharts;
 using LiveCharts.Wpf;
+using System.Diagnostics;
 using Winton.Models;
 
 namespace Winton.Services
@@ -53,7 +54,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetRevenueForTimePeriodAsync: {ex.Message}");
+                Debug.WriteLine($"[SalesDataServices] GetRevenueForTimePeriodAsync: {ex}");
             }
 
             return totalRevenue;
@@ -88,7 +89,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetMonthlyRevenueByYearAsync: {ex.Message}");
+                Debug.WriteLine($"[SalesDataServices] GetMonthlyRevenueByYearAsync: {ex}");
             }
 
             return new SeriesCollection
@@ -137,7 +138,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetCategorySalesDataAsync: {ex.Message}");
+                Debug.WriteLine($"[SalesDataServices] GetCategorySalesDataAsync: {ex}");
             }
 
             return seriesCollection;
@@ -166,7 +167,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetTotalCustomersAsync: {ex.Message}");
+                Debug.WriteLine($"[SalesDataServices] GetTotalCustomersAsync: {ex}");
             }
 
             return totalCustomers;
@@ -192,7 +193,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] DeleteReportAsync: {ex.Message}");
+                Debug.WriteLine($"[SalesDataServices] DeleteReportAsync: {ex}");
                 return false;
             }
         }
@@ -225,7 +226,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetReportsFromLastTwoYearsAsync: {ex.Message}");
+                Debug.WriteLine($"[SalesDataServices] GetReportsFromLastTwoYearsAsync: {ex}");
             }
 
             return reportDates;
@@ -267,7 +268,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Error] GetReportDetailsByDateAsync: {ex.Message}");
+                Debug.WriteLine($"[SalesDataServices] GetReportDetailsByDateAsync: {ex}");
             }
 
             return reportDetails;

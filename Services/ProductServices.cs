@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.Sqlite;
+using System.Diagnostics;
 using Winton.Models;
 
 namespace Winton.Services
@@ -41,7 +42,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error retrieving products: {ex.Message}");
+                Debug.WriteLine($"[ProductService] GetProductsAsync: {ex}");
             }
 
             return products;
@@ -78,7 +79,7 @@ namespace Winton.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching product item numbers: {ex.Message}");
+                Debug.WriteLine($"[ProductService] GetProductItemNumbersAsync: {ex}");
             }
 
             return itemNumbers;

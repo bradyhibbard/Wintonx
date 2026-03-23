@@ -7,8 +7,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
-using System.Xml;
 using Winton.Services;
 using Winton.Views;
 
@@ -34,7 +32,7 @@ namespace Winton
         private async Task InitializeAsync()
         {
             await DatabaseService.InitializeDatabaseAsync();
-            Console.WriteLine($"Using DB path: {Path.GetFullPath(DatabaseConfig.DbPath)}");
+            Debug.WriteLine($"Using DB path: {Path.GetFullPath(DatabaseConfig.DbPath)}");
 
             MainContent.Content = new Dashboard();  // Load Dashboard after DB initializes
         }

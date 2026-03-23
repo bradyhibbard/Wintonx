@@ -78,8 +78,10 @@ public class DashboardViewModel : INotifyPropertyChanged
 
     public DashboardViewModel()
     {
-        _ = LoadDataAsync();
+        InitializeData();
     }
+
+    private async void InitializeData() => await LoadDataAsync();
 
     private async Task LoadDataAsync()
     {

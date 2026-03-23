@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -191,7 +192,7 @@ namespace Winton.Helpers
                 );
             }
 
-            Console.WriteLine($"Adding Shape: Name={shapeName}, ShapeType={shapeType}, X={x}, Y={y}, Width={width}, Height={height}");
+            Debug.WriteLine($"Adding Shape: Name={shapeName}, ShapeType={shapeType}, X={x}, Y={y}, Width={width}, Height={height}");
         }
 
 
@@ -236,11 +237,11 @@ namespace Winton.Helpers
             var newlyClickedElement = sender as FrameworkElement;
 
             // Log the clicked element for debugging
-            Console.WriteLine($"Clicked Element: {newlyClickedElement?.Tag}");
+            Debug.WriteLine($"Clicked Element: {newlyClickedElement?.Tag}");
 
             if (newlyClickedElement == null)
             {
-                Console.WriteLine("No valid element selected.");
+                Debug.WriteLine("No valid element selected.");
                 return;
             }
 
@@ -258,7 +259,7 @@ namespace Winton.Helpers
 
             // 🛠 2. Update _selectedElement to the new one
             _selectedElement = newlyClickedElement;
-            Console.WriteLine($"Newly Selected Element: {_selectedElement?.Tag}");
+            Debug.WriteLine($"Newly Selected Element: {_selectedElement?.Tag}");
 
             _mouseOffset = e.GetPosition(_canvas);
             _mouseOffset.X -= Canvas.GetLeft(_selectedElement);
@@ -338,7 +339,7 @@ namespace Winton.Helpers
                     // Only set the move save flag for EditableSalesFloor
                     if (_parentControl is EditableSalesFloor editableSalesFloor)
                     {
-                        editableSalesFloor._isMoveSave = true;
+                        editableSalesFloor.IsMoveSave = true;
                     }
 
                     _canvas.Children.Remove(_selectedElement);
@@ -484,7 +485,7 @@ namespace Winton.Helpers
 
         public void ClearSelection()
         {
-            Console.WriteLine("ClearSelection called. Current _selectedElement: " + (_selectedElement?.Tag ?? "None"));
+            Debug.WriteLine("ClearSelection called. Current _selectedElement: " + (_selectedElement?.Tag ?? "None"));
 
             if (_selectedElement != null)
             {
@@ -499,7 +500,7 @@ namespace Winton.Helpers
                     buttonShape.StrokeThickness = 1;
                 }
 
-                Console.WriteLine("Element unhighlighted: " + _selectedElement?.Tag);
+                Debug.WriteLine("Element unhighlighted: " + _selectedElement?.Tag);
                 _selectedElement = null;
             }
         }
