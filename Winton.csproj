@@ -43,9 +43,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Assets\SF2.png" />
-    <SplashScreen Include="Assets\Splash.png">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </SplashScreen>
+    <Resource Include="Assets\Splash.png" />
   </ItemGroup>
 
   <ItemGroup>
