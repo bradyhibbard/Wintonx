@@ -126,7 +126,6 @@ namespace Winton.Views
             SalesFloorCanvas.Children.Add(_perimeterPreviewLine);
             SalesFloorCanvas.Children.Add(_partitionPreviewLine);
 
-            SalesFloorCanvas.MouseLeftButtonDown += SalesFloorCanvas_MouseLeftButtonDown;
             this.PreviewKeyDown += EditableSalesFloor_PreviewKeyDown;
             this.PreviewKeyUp += EditableSalesFloor_PreviewKeyUp;
 
@@ -484,10 +483,23 @@ namespace Winton.Views
         private void DrawPerimeter_Click(object sender, RoutedEventArgs e)
         {
             _isDrawingPartition = false;
-            _isDrawingPerimeter = !_isDrawingPerimeter;
 
-            if (_isDrawingPerimeter)
+            if (!_isDrawingPerimeter)
             {
+                // If a perimeter already exists, confirm before clearing it
+                if (_perimeterLine.Points.Count > 0)
+                {
+                    var result = MessageBox.Show(
+                        "A perimeter already exists. Starting a new drawing will replace it. Continue?",
+                        "Replace Perimeter",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+
+                    if (result != MessageBoxResult.Yes)
+                        return;
+                }
+
+                _isDrawingPerimeter = true;
                 _perimeterPoints.Clear();
                 _perimeterDots.Clear();
                 _perimeterLine.Points.Clear();
@@ -496,6 +508,7 @@ namespace Winton.Views
             }
             else
             {
+                _isDrawingPerimeter = false;
                 StopPerimeterDrawing();
             }
         }
@@ -739,7 +752,10 @@ namespace Winton.Views
             // Deselect the previous shape (remove highlight)
             if (_selectedShape != null)
             {
-                _selectedShape.Stroke = Brushes.Black;
+                // Restore the original color depending on shape type
+                _selectedShape.Stroke = _selectedShape.Tag?.ToString() == "Partition"
+                    ? Brushes.SteelBlue
+                    : Brushes.Black;
                 _selectedShape.StrokeThickness = 2;
             }
 
