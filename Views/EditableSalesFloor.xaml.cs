@@ -626,10 +626,6 @@ namespace Winton.Views
 
                         if (result == MessageBoxResult.Yes)
                         {
-                            var label = SalesFloorCanvas.Children.OfType<System.Windows.Controls.TextBlock>()
-                                .FirstOrDefault(tb => tb.Tag?.ToString() == "SectionLabel:" + sectionId);
-                            if (label != null) SalesFloorCanvas.Children.Remove(label);
-
                             await ProductPlacementServices.ArchiveAndDeleteSectionAsync(sectionId);
                             SalesFloorCanvas.Children.Remove(sectionElement);
                             ShowAutoSaved();
