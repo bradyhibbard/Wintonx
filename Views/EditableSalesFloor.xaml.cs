@@ -70,12 +70,21 @@ namespace Winton.Views
         // --------------------------------------------------
         // Partition Drawing State
         // --------------------------------------------------
+        private bool _polygonMode = false; // false = Line mode, true = Polygon mode
         private readonly List<Point> _partitionPoints = new();
         private readonly List<Ellipse> _partitionDots = new();
         private Polyline _partitionLine = new()
         {
             Stroke = Brushes.Black,
             StrokeThickness = 2
+        };
+        private readonly Line _partitionPreviewLine = new()
+        {
+            Stroke = Brushes.SteelBlue,
+            StrokeThickness = 1,
+            StrokeDashArray = new System.Windows.Media.DoubleCollection { 4, 2 },
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed
         };
 
         // --------------------------------------------------
@@ -115,6 +124,7 @@ namespace Winton.Views
             // Add initial perimeter line and preview line to the canvas
             SalesFloorCanvas.Children.Add(_perimeterLine);
             SalesFloorCanvas.Children.Add(_perimeterPreviewLine);
+            SalesFloorCanvas.Children.Add(_partitionPreviewLine);
 
             SalesFloorCanvas.MouseLeftButtonDown += SalesFloorCanvas_MouseLeftButtonDown;
             this.PreviewKeyDown += EditableSalesFloor_PreviewKeyDown;
@@ -538,7 +548,17 @@ namespace Winton.Views
             // ----- ESCAPE: cancel active drawing -----
             if (e.Key == Key.Escape)
             {
-                if (_isDrawingPerimeter) StopPerimeterDrawing();
+                if (_isDrawingPerimeter)
+                    StopPerimeterDrawing();
+
+                if (_isDrawingPartition)
+                {
+                    _partitionPoints.Clear();
+                    _partitionDots.Clear();
+                    _partitionLine.Points.Clear();
+                    _partitionPreviewLine.Visibility = Visibility.Collapsed;
+                }
+
                 e.Handled = true;
                 return;
             }
@@ -638,42 +658,9 @@ namespace Winton.Views
 
 
 
-        private async void EditableSalesFloor_PreviewKeyUp(object sender, KeyEventArgs e)
+        private void EditableSalesFloor_PreviewKeyUp(object sender, KeyEventArgs e)
         {
-            // Finalize partition when Shift is released
-            if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) && _isDrawingPartition)
-            {
-                if (_partitionPoints.Any())
-                {
-                    // Create a new Partition from the current drawing
-                    var partition = new Partition();
-                    partition.Points.AddRange(_partitionPoints);
-                    _partitions.Add(partition);
-                }
-
-                // Finalize the partition drawing by pushing to the undo stack.
-                var finalized = new FinalizedShape();
-                finalized.Elements.Add(_partitionLine);
-                finalized.Elements.AddRange(_partitionDots);
-                _finalizedShapes.Push(finalized);
-
-                // Clear the local drawing state for partition.
-                _partitionPoints.Clear();
-                _partitionDots.Clear();
-
-                // Create a fresh Polyline for future partition drawing.
-                _partitionLine = new Polyline
-                {
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 2
-                };
-                SalesFloorCanvas.Children.Add(_partitionLine);
-                SalesFloorCanvas.Cursor = Cursors.Cross;
-
-                // Save partitions to the database.
-                await CanvasService.SavePartitionsAsync(_partitions, new List<string>());
-                ShowAutoSaved();
-            }
+            // Shift-release no longer finalizes partitions; mode toggle replaced this interaction.
         }
 
         private void SalesFloorCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -690,9 +677,19 @@ namespace Winton.Views
             }
 
             if (_isDrawingPerimeter)
+            {
                 HandlePerimeterDrawing(clickedPoint);
+            }
             else if (_isDrawingPartition)
+            {
+                // Double-click finalizes a polygon in progress
+                if (e.ClickCount == 2 && _polygonMode && _partitionPoints.Count >= 2)
+                {
+                    FinalizeCurrentPartition();
+                    return;
+                }
                 HandlePartitionDrawing(clickedPoint);
+            }
         }
 
 
@@ -807,22 +804,45 @@ namespace Winton.Views
 
         private void SalesFloorCanvas_MouseMove(object sender, MouseEventArgs e)
         {
-            if (!_isDrawingPerimeter || !_perimeterPoints.Any()) return;
-
             Point pos = SnapToGrid(e.GetPosition(SalesFloorCanvas));
-            Point last = _perimeterPoints.Last();
 
-            _perimeterPreviewLine.X1 = last.X;
-            _perimeterPreviewLine.Y1 = last.Y;
-            _perimeterPreviewLine.X2 = pos.X;
-            _perimeterPreviewLine.Y2 = pos.Y;
-            _perimeterPreviewLine.Visibility = Visibility.Visible;
-
-            // Hint: highlight first dot green when cursor is near closing point
-            if (_perimeterDots.Any())
+            // Perimeter preview
+            if (_isDrawingPerimeter && _perimeterPoints.Any())
             {
-                bool nearClose = _perimeterPoints.Count > 2 && IsCloseToFirstPerimeter(pos);
-                _perimeterDots.First().Fill = nearClose ? Brushes.LimeGreen : Brushes.Red;
+                Point last = _perimeterPoints.Last();
+                _perimeterPreviewLine.X1 = last.X;
+                _perimeterPreviewLine.Y1 = last.Y;
+                _perimeterPreviewLine.X2 = pos.X;
+                _perimeterPreviewLine.Y2 = pos.Y;
+                _perimeterPreviewLine.Visibility = Visibility.Visible;
+
+                if (_perimeterDots.Any())
+                {
+                    bool nearClose = _perimeterPoints.Count > 2 && IsCloseToFirstPerimeter(pos);
+                    _perimeterDots.First().Fill = nearClose ? Brushes.LimeGreen : Brushes.Red;
+                }
+            }
+
+            // Partition preview (polygon mode only — line mode doesn't need a trailing preview)
+            if (_isDrawingPartition && _polygonMode && _partitionPoints.Any())
+            {
+                Point last = _partitionPoints.Last();
+                _partitionPreviewLine.X1 = last.X;
+                _partitionPreviewLine.Y1 = last.Y;
+                _partitionPreviewLine.X2 = pos.X;
+                _partitionPreviewLine.Y2 = pos.Y;
+                _partitionPreviewLine.Visibility = Visibility.Visible;
+
+                // Snap-to-close hint: turn first dot green when near origin
+                if (_partitionDots.Any())
+                {
+                    bool nearClose = _partitionPoints.Count > 2 && IsCloseToFirstPartition(pos);
+                    _partitionDots.First().Fill = nearClose ? Brushes.LimeGreen : Brushes.Blue;
+                }
+            }
+            else
+            {
+                _partitionPreviewLine.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -869,25 +889,26 @@ namespace Winton.Views
 
         private void HandlePartitionDrawing(Point clickedPoint)
         {
-
-            bool multiPoint = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
             var dot = CreateDot(clickedPoint, Brushes.Blue);
 
-            if (multiPoint)
+            if (_polygonMode)
             {
+                // Polygon mode: accumulate vertices until user closes or finalizes
                 _partitionPoints.Add(clickedPoint);
                 _partitionLine.Points.Add(clickedPoint);
                 SalesFloorCanvas.Children.Add(dot);
                 _partitionDots.Add(dot);
 
-                // Optionally, if the user clicks near the first point while holding Shift, you could close the shape.
+                // Auto-close when clicking near the first point (requires 3+ points)
                 if (_partitionPoints.Count > 2 && IsCloseToFirstPartition(clickedPoint))
                 {
                     _partitionLine.Points.Add(_partitionPoints.First());
+                    FinalizeCurrentPartition();
                 }
             }
             else
             {
+                // Line mode: every 2 clicks produces one line segment
                 if (_partitionPoints.Count == 0)
                 {
                     _partitionPoints.Add(clickedPoint);
@@ -895,38 +916,62 @@ namespace Winton.Views
                     SalesFloorCanvas.Children.Add(dot);
                     _partitionDots.Add(dot);
                 }
-                else if (_partitionPoints.Count == 1)
+                else
                 {
                     _partitionPoints.Add(clickedPoint);
                     _partitionLine.Points.Add(clickedPoint);
                     SalesFloorCanvas.Children.Add(dot);
                     _partitionDots.Add(dot);
-
-                    // Immediately finalize the line after 2 points if desired.
-                    _partitionPoints.Clear();
-                    _partitionDots.Clear();
-
-                    var finalized = new FinalizedShape();
-                    finalized.Elements.Add(_partitionLine);
-                    finalized.Elements.Add(dot);
-                    _finalizedShapes.Push(finalized);
-
-                    // Create a new partition line for future drawing
-                    _partitionLine = new Polyline
-                    {
-                        Stroke = Brushes.Black,
-                        StrokeThickness = 2
-                    };
-
-                    // 🆕 ADD these two lines to make partitions selectable:
-                    _partitionLine.Tag = "Partition";
-                    _partitionLine.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
-
-                    SalesFloorCanvas.Children.Add(_partitionLine);
+                    FinalizeCurrentPartition();
                 }
             }
         }
 
+
+        // Shared finalization for both Line and Polygon modes
+        private async void FinalizeCurrentPartition()
+        {
+            if (_partitionPoints.Any())
+            {
+                var partition = new Partition();
+                partition.Points.AddRange(_partitionPoints);
+                _partitions.Add(partition);
+            }
+
+            var finalized = new FinalizedShape();
+            finalized.Elements.Add(_partitionLine);
+            finalized.Elements.AddRange(_partitionDots);
+            _finalizedShapes.Push(finalized);
+
+            _partitionLine.Tag = "Partition";
+            _partitionLine.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
+
+            _partitionPoints.Clear();
+            _partitionDots.Clear();
+            _partitionPreviewLine.Visibility = Visibility.Collapsed;
+
+            _partitionLine = new Polyline
+            {
+                Stroke = Brushes.Black,
+                StrokeThickness = 2,
+                Tag = "Partition"
+            };
+            _partitionLine.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
+            SalesFloorCanvas.Children.Add(_partitionLine);
+
+            await CanvasService.SavePartitionsAsync(_partitions, new List<string>());
+            ShowAutoSaved();
+        }
+
+        // Right-click finalizes a polygon in progress (without needing to close to origin)
+        private void SalesFloorCanvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isEditMode || !_isDrawingPartition || !_polygonMode) return;
+            if (_partitionPoints.Count < 2) return;
+
+            e.Handled = true;
+            FinalizeCurrentPartition();
+        }
 
         // Partial Undo for Perimeter
         private void UndoPerimeterPoint()
@@ -1121,7 +1166,6 @@ namespace Winton.Views
             _isDrawingPerimeter = false;
             _isDrawingPartition = !_isDrawingPartition;
 
-
             if (_isDrawingPartition)
             {
                 _partitionPoints.Clear();
@@ -1132,11 +1176,30 @@ namespace Winton.Views
                     SalesFloorCanvas.Children.Add(_partitionLine);
 
                 SalesFloorCanvas.Cursor = Cursors.Cross;
+                FloorModeToggle.Visibility = Visibility.Visible;
             }
             else
             {
+                // Cancel any in-progress drawing
+                _partitionPoints.Clear();
+                _partitionDots.Clear();
+                _partitionLine.Points.Clear();
+                _partitionPreviewLine.Visibility = Visibility.Collapsed;
+
                 SalesFloorCanvas.Cursor = Cursors.Arrow;
+                FloorModeToggle.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private void LineModeButton_Checked(object sender, RoutedEventArgs e)
+        {
+            _polygonMode = false;
+            _partitionPreviewLine.Visibility = Visibility.Collapsed;
+        }
+
+        private void PolygonModeButton_Checked(object sender, RoutedEventArgs e)
+        {
+            _polygonMode = true;
         }
 
         #endregion
