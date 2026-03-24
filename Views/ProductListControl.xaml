@@ -51,7 +51,6 @@
             </Border.Effect>
 
             <ListView x:Name="ProductListView"
-                      ItemsSource="{Binding Products}"
                       Background="Transparent"
                       BorderThickness="0"
                       Foreground="{DynamicResource PrimaryText}">
