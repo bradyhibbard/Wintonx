@@ -374,7 +374,7 @@ namespace Winton.Services
                             else if (existingItems[item.ItemNumber] != item.ItemName)
                             {
                                 using (var cmd = new SqliteCommand(
-                                    "UPDATE Products SET ItemName = @ItemName, Vendor = @Vendor, Cat = @Cat, Grp = @Grp WHERE ItemNumber = @ItemNumber",
+                                    "UPDATE Products SET ItemName = @ItemName, Vendor = @Vendor, Category = @Cat, Grp = @Grp WHERE ItemNumber = @ItemNumber",
                                     connection, transaction))
                                 {
                                     cmd.Parameters.AddWithValue("@ItemNumber", item.ItemNumber);
