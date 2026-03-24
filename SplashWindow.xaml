@@ -12,7 +12,7 @@
         WindowStartupLocation="CenterScreen"
         Opacity="0">
 
-    <Border Background="#DDFFFFFF"
+    <Border Background="White"
             CornerRadius="18"
             Padding="20"
             SnapsToDevicePixels="True">
