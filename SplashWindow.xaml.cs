@@ -47,12 +47,13 @@ namespace Winton
             // Lower Topmost so any update dialog can appear above the splash
             Topmost = false;
 
-            // Kick off update check (uses your existing GitHub release logic + prompts)
+            // Kick off update check and enforce a minimum visible time
             var checker = new UpdateChecker();
             var updateTask = checker.AutoCheckOnStartupAsync(showNoUpdateToast: false, ct);
+            var minDisplayTask = Task.Delay(2000, ct);
 
-            // Wait for either update flow to finish OR user hits Skip
-            var winner = await Task.WhenAny(updateTask, _skipTcs.Task);
+            // Wait for both the update check and minimum time, or until user skips
+            var winner = await Task.WhenAny(Task.WhenAll(updateTask, minDisplayTask), _skipTcs.Task);
 
             if (winner == _skipTcs.Task)
             {
