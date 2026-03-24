@@ -29,9 +29,8 @@ namespace Winton.Views
         private bool _isDrawingPartition = false;
         private bool _isSectionsPanelVisible = false;
         private bool _isEditMode = false;
-        private bool _hasUnsavedChanges = false;
-        public bool IsMoveSave { get; set; }
         private bool _isClearingCanvas = false;
+        private int _saveFlashVersion = 0;
         private Section _copiedSection;
 
 
@@ -254,8 +253,6 @@ namespace Winton.Views
                     existingSectionId: null, // ensures new UUID
                     wrapAsButton: true
                 );
-
-                _hasUnsavedChanges = true;
             }
         }
 
@@ -382,44 +379,15 @@ namespace Winton.Views
 
         private void EditFloor_Click(object sender, RoutedEventArgs e)
         {
-            // Toggle Edit Mode
             _isEditMode = !_isEditMode;
             _sectionManager.IsEditMode = _isEditMode;
-
-            // Show or hide the Edit Tools Panel
             EditToolsPanel.Visibility = _isEditMode ? Visibility.Visible : Visibility.Collapsed;
-
-            // 🛠 Change the button text
-            if (sender is Button button)
-            {
-                button.Content = _isEditMode ? "Disable Edit Mode" : "Enable Edit Mode";
-            }
+            EditModeButton.Content = _isEditMode ? "Disable Edit Mode" : "Enable Edit Mode";
         }
 
 
         private void EditableSalesFloor_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (_hasUnsavedChanges)
-            {
-                var result = MessageBox.Show(
-                    "You have unsaved changes. Do you want to save before exiting?",
-                    "Unsaved Changes",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Warning
-                );
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    SaveChangesAsync().Wait();
-                }
-                else if (result == MessageBoxResult.Cancel)
-                {
-                    // Prevent exiting by returning early
-                    return;
-                }
-            }
-
-            // Clear the canvas
             ClearSectionsFromCanvas();
             Debug.WriteLine("[EditableSalesFloor] Canvas cleared upon exit.");
         }
@@ -438,107 +406,31 @@ namespace Winton.Views
             MessageBox.Show("Applying filters...");
         }
 
-        private async Task SaveChangesAsync()
+
+
+
+        public async void ShowAutoSaved()
         {
-            if (_isClearingCanvas)
+            int version = ++_saveFlashVersion;
+            SaveStatusText.Opacity = 1;
+            await Task.Delay(1500);
+            if (version == _saveFlashVersion)
             {
-                return;
-            }
-
-            try
-            {
-                // 1. Save Sections Before Clearing
-                var sections = SalesFloorCanvas.Children
-                    .OfType<FrameworkElement>()
-                    .Where(e => e.Tag is string tag && tag != "Partition" && tag != "SectionShape")
-                    .ToList();
-
-                foreach (var sectionElement in sections)
-                {
-                    string sectionId = sectionElement.Tag as string;
-                    double x = Canvas.GetLeft(sectionElement);
-                    double y = Canvas.GetTop(sectionElement);
-                    double width = sectionElement.Width;
-                    double height = sectionElement.Height;
-
-                    double rotation = 0;
-                    if (sectionElement.RenderTransform is TransformGroup tg)
-                    {
-                        var rotateTransform = tg.Children.OfType<RotateTransform>().FirstOrDefault();
-                        if (rotateTransform != null)
-                        {
-                            rotation = rotateTransform.Angle;
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(sectionId))
-                    {
-                        await CanvasService.UpdateSectionDimensionsAsync(sectionId, x, y, width, height, rotation);
-                        Debug.WriteLine($"[EditableSalesFloor] Section saved - ID: {sectionId} X: {x}, Y: {y}");
-                    }
-                }
-
-                // Save partitions (deleted partitions are already handled in real time)
-                await CanvasService.SavePartitionsAsync(_partitions, _deletedPartitionIds);
-                _deletedPartitionIds.Clear();
-
-                _hasUnsavedChanges = false;
-
-                MessageBox.Show("Changes saved successfully!", "Debug Info");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error in SaveChangesAsync: {ex.Message}", "Error");
+                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(400));
+                SaveStatusText.BeginAnimation(UIElement.OpacityProperty, fadeOut);
             }
         }
 
-
-
-
-
-
-        private async void SaveChanges_Click(object sender, RoutedEventArgs e)
+        private void ExitEditMode_Click(object sender, RoutedEventArgs e)
         {
-            await SaveChangesAsync();
-            MessageBox.Show("Changes saved successfully!");
-        }
-
-
-
-
-        private async void ExitEditMode_Click(object sender, RoutedEventArgs e)
-        {
-            Debug.WriteLine("[EditableSalesFloor] Exiting Edit Mode...");
-
-            // 1. Save changes
-            if (_hasUnsavedChanges)
-            {
-                await SaveChangesAsync();
-                Debug.WriteLine("[EditableSalesFloor] Changes saved.");
-            }
-
-            // 2. Turn off partition drawing mode if active
             if (_isDrawingPartition)
-            {
-                Debug.WriteLine("[EditableSalesFloor] Turning off partition drawing mode...");
                 FloorDesign_Click(null, null);
-            }
 
-            // 3. Disable editing
             _isEditMode = false;
             _isEditNavVisible = false;
+            _sectionManager.IsEditMode = false;
             EditToolsPanel.Visibility = Visibility.Collapsed;
-
-            var editButton = EditToolsPanel.Children
-                .OfType<Button>()
-                .FirstOrDefault(btn => btn.Content.ToString().Contains("Disable Edit Mode"));
-
-            if (editButton != null)
-            {
-                editButton.Content = "Enable Edit Mode";
-            }
-
-            Debug.WriteLine("[EditableSalesFloor] Edit Mode disabled and button text updated.");
+            EditModeButton.Content = "Enable Edit Mode";
         }
 
 
@@ -549,7 +441,6 @@ namespace Winton.Views
             _isSectionsPanelVisible = !_isSectionsPanelVisible;
             SectionsPanel.Visibility = _isSectionsPanelVisible ? Visibility.Visible : Visibility.Collapsed;
 
-            MessageBox.Show("Changes saved. Exiting Edit Mode.");
         }
 
         private void AddSquare_Click(object sender, RoutedEventArgs e)
@@ -615,7 +506,6 @@ namespace Winton.Views
                 _perimeterPoints.Clear();
                 _perimeterDots.Clear();
                 _perimeterLine.Points.Clear();
-                MessageBox.Show("Click on the canvas to define the store perimeter.");
                 SalesFloorCanvas.Cursor = Cursors.Cross;
             }
             else
@@ -653,7 +543,6 @@ namespace Winton.Views
         private async void EditableSalesFloor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (!_isEditMode) return;
-            _hasUnsavedChanges = true;
 
             // ----- COPY (Ctrl+C) -----
             if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
@@ -698,7 +587,6 @@ namespace Winton.Views
             {
                 // Remove from Canvas
                 SalesFloorCanvas.Children.Remove(_selectedShape);
-                _hasUnsavedChanges = true;
 
                 if (_selectedShape.Tag?.ToString() == "Partition")
                 {
@@ -714,6 +602,7 @@ namespace Winton.Views
                                 _deletedPartitionIds.Add(removedPartition.Id);
 
                             await CanvasService.DeletePartitionAsync(removedPartition.Id);
+                            ShowAutoSaved();
                             Debug.WriteLine($"[EditableSalesFloor] Partition {removedPartition.Id} deleted via Delete key.");
                         }
                     }
@@ -765,13 +654,13 @@ namespace Winton.Views
 
                 // Save partitions to the database.
                 await CanvasService.SavePartitionsAsync(_partitions, new List<string>());
+                ShowAutoSaved();
             }
         }
 
         private void SalesFloorCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (!_isEditMode) return;
-            _hasUnsavedChanges = true;
 
             Point clickedPoint = SnapToGrid(e.GetPosition(SalesFloorCanvas));
 
@@ -900,7 +789,6 @@ namespace Winton.Views
 
         private void HandlePerimeterDrawing(Point clickedPoint)
         {
-            _hasUnsavedChanges = true;
 
             _perimeterPoints.Add(clickedPoint);
             _perimeterLine.Points.Add(clickedPoint);
@@ -917,8 +805,8 @@ namespace Winton.Views
                 _isDrawingPerimeter = false;
                 SalesFloorCanvas.Cursor = Cursors.Arrow;
 
-                MessageBox.Show("Perimeter completed!");
                 _ = SavePerimeterToDatabaseAsync();
+                ShowAutoSaved();
 
                 // Finalize the perimeter shape.
                 var finalized = new FinalizedShape();
@@ -942,7 +830,6 @@ namespace Winton.Views
 
         private void HandlePartitionDrawing(Point clickedPoint)
         {
-            _hasUnsavedChanges = true;
 
             bool multiPoint = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
             var dot = CreateDot(clickedPoint, Brushes.Blue);
@@ -1040,7 +927,6 @@ namespace Winton.Views
             if (!_finalizedShapes.Any()) return;
 
             var shapeGroup = _finalizedShapes.Pop();
-            _hasUnsavedChanges = true; // Ensure we trigger a save when exiting or saving
 
             var partitionLine = shapeGroup.Elements
                                            .OfType<Polyline>()
@@ -1087,14 +973,11 @@ namespace Winton.Views
             {
                 ClearPerimeter();
                 await CanvasService.SavePerimeterAsync(_perimeterPoints);
-                MessageBox.Show("Perimeter cleared.");
             }
         }
 
         private void ClearPerimeter()
         {
-
-            _hasUnsavedChanges = true;
 
             _perimeterPoints.Clear();
             _perimeterLine.Points.Clear();
@@ -1210,12 +1093,10 @@ namespace Winton.Views
                     SalesFloorCanvas.Children.Add(_partitionLine);
 
                 SalesFloorCanvas.Cursor = Cursors.Cross;
-                MessageBox.Show("Floor Design mode activated. Click on the canvas to draw partition walls. Hold Shift for multi-point segments.");
             }
             else
             {
                 SalesFloorCanvas.Cursor = Cursors.Arrow;
-                MessageBox.Show("Floor Design mode deactivated.");
             }
         }
 

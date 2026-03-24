@@ -336,11 +336,8 @@ namespace Winton.Helpers
                 if (!string.IsNullOrEmpty(sectionId))
                 {
 
-                    // Only set the move save flag for EditableSalesFloor
                     if (_parentControl is EditableSalesFloor editableSalesFloor)
-                    {
-                        editableSalesFloor.IsMoveSave = true;
-                    }
+                        editableSalesFloor.ShowAutoSaved();
 
                     _canvas.Children.Remove(_selectedElement);
 
