@@ -88,7 +88,26 @@
                             Content="Floor"
                             Click="FloorDesign_Click"
                             Padding="12,6"
-                            Margin="0,0,10,0"/>
+                            Margin="0,0,4,0"/>
+
+                    <!-- Line / Polygon mode toggle, visible only when floor mode is active -->
+                    <StackPanel x:Name="FloorModeToggle"
+                                Orientation="Horizontal"
+                                Visibility="Collapsed"
+                                Margin="0,0,10,0">
+                        <RadioButton x:Name="LineModeButton"
+                                     Content="Line"
+                                     IsChecked="True"
+                                     GroupName="FloorDrawMode"
+                                     Checked="LineModeButton_Checked"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,6,0"/>
+                        <RadioButton x:Name="PolygonModeButton"
+                                     Content="Polygon"
+                                     GroupName="FloorDrawMode"
+                                     Checked="PolygonModeButton_Checked"
+                                     VerticalAlignment="Center"/>
+                    </StackPanel>
 
                     <Button Style="{StaticResource NavButton}"
                             Content="Add Sections"
@@ -127,6 +146,7 @@
                     Width="1600"
                     Height="900"
                     MouseLeftButtonDown="SalesFloorCanvas_MouseLeftButtonDown"
+                    MouseRightButtonDown="SalesFloorCanvas_MouseRightButtonDown"
                     MouseMove="SalesFloorCanvas_MouseMove">
 
                 <Canvas.ContextMenu>
