@@ -138,7 +138,6 @@ namespace Winton.Helpers
                 _canvas.Children.Add(sectionButton);
                 Canvas.SetLeft(sectionButton, x);
                 Canvas.SetTop(sectionButton, y);
-                AddSectionLabel(shapeName, sectionId, x, y, width, height);
 
                 // Optional: auto-select the new button for instant drag/visual feedback
                 if (_parentControl is EditableSalesFloor ef)
