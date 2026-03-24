@@ -33,31 +33,6 @@ namespace Winton.Helpers
             _parentControl = parentControl;
         }
 
-        private void AddSectionLabel(string text, string sectionId, double x, double y, double width, double height)
-        {
-            var label = new System.Windows.Controls.TextBlock
-            {
-                Text = text,
-                Width = width,
-                TextAlignment = TextAlignment.Center,
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 11,
-                Foreground = Brushes.Black,
-                IsHitTestVisible = false,
-                Tag = "SectionLabel:" + sectionId
-            };
-            Canvas.SetLeft(label, x);
-            Canvas.SetTop(label, y + (height - 14) / 2.0);
-            _canvas.Children.Add(label);
-        }
-
-        private void RemoveSectionLabel(string sectionId)
-        {
-            var label = _canvas.Children.OfType<System.Windows.Controls.TextBlock>()
-                .FirstOrDefault(tb => tb.Tag?.ToString() == "SectionLabel:" + sectionId);
-            if (label != null) _canvas.Children.Remove(label);
-        }
-
         public async Task AddShapeToCanvasAsync(
             string shapeName,
             string shapeType,
@@ -195,7 +170,6 @@ namespace Winton.Helpers
                 newShape.MouseRightButtonDown += Element_RightClick;
 
                 _canvas.Children.Add(newShape);
-                AddSectionLabel(shapeName, sectionId, x, y, width, height);
                 hostElement = newShape;
             }
 
@@ -367,7 +341,6 @@ namespace Winton.Helpers
                     if (_parentControl is EditableSalesFloor editableSalesFloor)
                         editableSalesFloor.ShowAutoSaved();
 
-                    RemoveSectionLabel(sectionId);
                     _canvas.Children.Remove(_selectedElement);
 
                     // Save the new position in the database
@@ -489,9 +462,6 @@ namespace Winton.Helpers
                         try
                         {
                             await ProductPlacementServices.ArchiveAndDeleteSectionAsync(sectionId);
-                            RemoveSectionLabel(
-                                (_selectedElement as Button)?.Tag as string ??
-                                (_selectedElement as Shape)?.Tag as string);
                             _canvas.Children.Remove(_selectedElement);
                             _selectedElement = null;
                             MessageBox.Show("Section deleted and products archived successfully.");
