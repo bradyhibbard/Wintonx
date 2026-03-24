@@ -253,6 +253,7 @@ namespace Winton.Views
                     existingSectionId: null, // ensures new UUID
                     wrapAsButton: true
                 );
+                ShowAutoSaved();
             }
         }
 
@@ -583,38 +584,61 @@ namespace Winton.Views
             }
 
             // ----- DELETE (Delete key) -----
-            if (e.Key == Key.Delete && _selectedShape != null)
+            if (e.Key == Key.Delete)
             {
-                // Remove from Canvas
-                SalesFloorCanvas.Children.Remove(_selectedShape);
-
-                if (_selectedShape.Tag?.ToString() == "Partition")
+                // Partition selected via _selectedShape
+                if (_selectedShape?.Tag?.ToString() == "Partition")
                 {
+                    SalesFloorCanvas.Children.Remove(_selectedShape);
                     var removedPartition = RemovePartitionAssociatedWithShape(_selectedShape);
-
                     if (removedPartition != null)
                     {
                         _partitions.Remove(removedPartition);
-
                         if (!string.IsNullOrEmpty(removedPartition.Id))
                         {
                             if (!_deletedPartitionIds.Contains(removedPartition.Id))
                                 _deletedPartitionIds.Add(removedPartition.Id);
-
                             await CanvasService.DeletePartitionAsync(removedPartition.Id);
                             ShowAutoSaved();
                             Debug.WriteLine($"[EditableSalesFloor] Partition {removedPartition.Id} deleted via Delete key.");
                         }
                     }
-                }
-                else if (_selectedShape.Tag?.ToString() == "SectionButton")
-                {
-                    // Future: handle section deletion if needed
+                    _selectedShape = null;
+                    e.Handled = true;
+                    return;
                 }
 
-                _selectedShape = null;
-                e.Handled = true;
-                return;
+                // Section selected via SectionManager
+                var sectionElement = _sectionManager.SelectedElement;
+                if (sectionElement != null)
+                {
+                    string sectionId =
+                        (sectionElement as Button)?.Tag as string ??
+                        sectionElement.Tag as string;
+
+                    if (!string.IsNullOrEmpty(sectionId))
+                    {
+                        var result = MessageBox.Show(
+                            "Delete this section? Products assigned to it will be archived.",
+                            "Confirm Delete",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            var label = SalesFloorCanvas.Children.OfType<System.Windows.Controls.TextBlock>()
+                                .FirstOrDefault(tb => tb.Tag?.ToString() == "SectionLabel:" + sectionId);
+                            if (label != null) SalesFloorCanvas.Children.Remove(label);
+
+                            await ProductPlacementServices.ArchiveAndDeleteSectionAsync(sectionId);
+                            SalesFloorCanvas.Children.Remove(sectionElement);
+                            ShowAutoSaved();
+                            Debug.WriteLine($"[EditableSalesFloor] Section {sectionId} deleted via Delete key.");
+                        }
+                    }
+                    e.Handled = true;
+                    return;
+                }
             }
         }
 

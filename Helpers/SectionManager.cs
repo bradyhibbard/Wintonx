@@ -21,6 +21,7 @@ namespace Winton.Helpers
         private readonly UserControl _parentControl;
 
         public bool IsEditMode { get; set; } = false;
+        public FrameworkElement SelectedElement => _selectedElement;
 
 
         // Event raised when a section is selected (clicked/double-clicked).
@@ -30,6 +31,31 @@ namespace Winton.Helpers
         {
             _canvas = canvas;
             _parentControl = parentControl;
+        }
+
+        private void AddSectionLabel(string text, string sectionId, double x, double y, double width, double height)
+        {
+            var label = new System.Windows.Controls.TextBlock
+            {
+                Text = text,
+                Width = width,
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Foreground = Brushes.Black,
+                IsHitTestVisible = false,
+                Tag = "SectionLabel:" + sectionId
+            };
+            Canvas.SetLeft(label, x);
+            Canvas.SetTop(label, y + (height - 14) / 2.0);
+            _canvas.Children.Add(label);
+        }
+
+        private void RemoveSectionLabel(string sectionId)
+        {
+            var label = _canvas.Children.OfType<System.Windows.Controls.TextBlock>()
+                .FirstOrDefault(tb => tb.Tag?.ToString() == "SectionLabel:" + sectionId);
+            if (label != null) _canvas.Children.Remove(label);
         }
 
         public async Task AddShapeToCanvasAsync(
@@ -137,6 +163,7 @@ namespace Winton.Helpers
                 _canvas.Children.Add(sectionButton);
                 Canvas.SetLeft(sectionButton, x);
                 Canvas.SetTop(sectionButton, y);
+                AddSectionLabel(shapeName, sectionId, x, y, width, height);
 
                 // Optional: auto-select the new button for instant drag/visual feedback
                 if (_parentControl is EditableSalesFloor ef)
@@ -168,6 +195,7 @@ namespace Winton.Helpers
                 newShape.MouseRightButtonDown += Element_RightClick;
 
                 _canvas.Children.Add(newShape);
+                AddSectionLabel(shapeName, sectionId, x, y, width, height);
                 hostElement = newShape;
             }
 
@@ -339,6 +367,7 @@ namespace Winton.Helpers
                     if (_parentControl is EditableSalesFloor editableSalesFloor)
                         editableSalesFloor.ShowAutoSaved();
 
+                    RemoveSectionLabel(sectionId);
                     _canvas.Children.Remove(_selectedElement);
 
                     // Save the new position in the database
@@ -460,6 +489,9 @@ namespace Winton.Helpers
                         try
                         {
                             await ProductPlacementServices.ArchiveAndDeleteSectionAsync(sectionId);
+                            RemoveSectionLabel(
+                                (_selectedElement as Button)?.Tag as string ??
+                                (_selectedElement as Shape)?.Tag as string);
                             _canvas.Children.Remove(_selectedElement);
                             _selectedElement = null;
                             MessageBox.Show("Section deleted and products archived successfully.");
