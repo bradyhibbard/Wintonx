@@ -73,7 +73,9 @@
                                     <Border x:Name="Container"
                                             Background="{TemplateBinding Background}"
                                             CornerRadius="6">
-                                        <ContentPresenter Margin="4"/>
+                                        <GridViewRowPresenter Margin="4"
+                                            Content="{TemplateBinding Content}"
+                                            Columns="{Binding Path=View.Columns, RelativeSource={RelativeSource AncestorType=ListView}}"/>
                                     </Border>
 
                                     <ControlTemplate.Triggers>
