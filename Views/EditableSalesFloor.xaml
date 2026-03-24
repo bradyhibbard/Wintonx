@@ -39,7 +39,8 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
 
-                    <Button Style="{StaticResource NavButton}"
+                    <Button x:Name="EditModeButton"
+                            Style="{StaticResource NavButton}"
                             Content="Enable Edit Mode"
                             Click="EditFloor_Click"
                             Padding="12,6"
@@ -81,16 +82,18 @@
                             Margin="0,0,10,0"/>
 
                     <Button Style="{StaticResource NavButton}"
-                            Content="Save"
-                            Click="SaveChanges_Click"
-                            Padding="12,6"
-                            Margin="0,0,10,0"/>
-
-                    <Button Style="{StaticResource NavButton}"
-                            Content="Save &amp; Exit"
+                            Content="Exit Edit Mode"
                             Click="ExitEditMode_Click"
                             Padding="12,6"
-                            Foreground="{DynamicResource Accent}"/>
+                            Foreground="{DynamicResource Accent}"
+                            Margin="0,0,10,0"/>
+
+                    <TextBlock x:Name="SaveStatusText"
+                               Text="Saved"
+                               Opacity="0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Accent}"
+                               FontSize="13"/>
                 </StackPanel>
 
             </StackPanel>
