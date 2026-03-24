@@ -62,9 +62,24 @@
                             VerticalAlignment="Center">
 
                     <Button Style="{StaticResource NavButton}"
-                            x:Name="PerimeterButton"
-                            Content="Perimeter"
-                            Click="PerimeterButton_Click"
+                            x:Name="DrawPerimeterButton"
+                            Content="Draw Perimeter"
+                            Click="DrawPerimeter_Click"
+                            Padding="12,6"
+                            Margin="0,0,4,0"/>
+
+                    <Button Style="{StaticResource NavButton}"
+                            x:Name="UndoPerimeterButton"
+                            Content="Undo Point"
+                            Click="UndoPerimeterButton_Click"
+                            IsEnabled="False"
+                            Padding="12,6"
+                            Margin="0,0,4,0"/>
+
+                    <Button Style="{StaticResource NavButton}"
+                            x:Name="ClearPerimeterButton"
+                            Content="Clear Perimeter"
+                            Click="ClearPerimeterButton_Click"
                             Padding="12,6"
                             Margin="0,0,10,0"/>
 
@@ -111,7 +126,8 @@
                     Background="{DynamicResource SurfaceBackground}"
                     Width="1600"
                     Height="900"
-                    MouseLeftButtonDown="SalesFloorCanvas_MouseLeftButtonDown">
+                    MouseLeftButtonDown="SalesFloorCanvas_MouseLeftButtonDown"
+                    MouseMove="SalesFloorCanvas_MouseMove">
 
                 <Canvas.ContextMenu>
                     <ContextMenu>

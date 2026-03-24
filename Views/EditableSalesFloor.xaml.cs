@@ -58,6 +58,14 @@ namespace Winton.Views
             Stroke = Brushes.Black,
             StrokeThickness = 2
         };
+        private readonly Line _perimeterPreviewLine = new()
+        {
+            Stroke = Brushes.Gray,
+            StrokeThickness = 1,
+            StrokeDashArray = new System.Windows.Media.DoubleCollection { 4, 2 },
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed
+        };
 
         // --------------------------------------------------
         // Partition Drawing State
@@ -77,11 +85,6 @@ namespace Winton.Views
         // that groups a line plus its dots.
         private readonly Stack<FinalizedShape> _finalizedShapes = new();
         private List<Partition> _partitions = new();
-
-        // --------------------------------------------------
-        // Context Menu for Perimeter
-        // --------------------------------------------------
-        private ContextMenu _perimeterContextMenu;
 
         // --------------------------------------------------
         // Helper class to group finalized shapes
@@ -109,8 +112,9 @@ namespace Winton.Views
 
             DrawGrid();
 
-            // Add initial perimeter line to the canvas
+            // Add initial perimeter line and preview line to the canvas
             SalesFloorCanvas.Children.Add(_perimeterLine);
+            SalesFloorCanvas.Children.Add(_perimeterPreviewLine);
 
             SalesFloorCanvas.MouseLeftButtonDown += SalesFloorCanvas_MouseLeftButtonDown;
             this.PreviewKeyDown += EditableSalesFloor_PreviewKeyDown;
@@ -127,7 +131,6 @@ namespace Winton.Views
                 await LoadPartitionsFromDatabaseAsync();
             };
 
-            InitializePerimeterContextMenu();
         }
 
         private void InitializeCanvas()
@@ -267,28 +270,6 @@ namespace Winton.Views
         {
             await PasteCopiedShapeAsync();
         }
-
-        #region Context Menu Setup
-
-        private void InitializePerimeterContextMenu()
-        {
-            _perimeterContextMenu = new ContextMenu();
-
-            MenuItem drawItem = new MenuItem { Header = "Draw" };
-            drawItem.Click += DrawPerimeter_Click;
-
-            MenuItem undoItem = new MenuItem { Header = "Undo" };
-            undoItem.Click += UndoPerimeter_Click;
-
-            MenuItem clearItem = new MenuItem { Header = "Clear" };
-            clearItem.Click += ClearPerimeter_Click;
-
-            _perimeterContextMenu.Items.Add(drawItem);
-            _perimeterContextMenu.Items.Add(undoItem);
-            _perimeterContextMenu.Items.Add(clearItem);
-        }
-
-        #endregion
 
         #region Helper Methods
 
@@ -490,13 +471,6 @@ namespace Winton.Views
             MessageBox.Show("Move Section tool activated.");
         }
 
-        private void PerimeterButton_Click(object sender, RoutedEventArgs e)
-        {
-            PerimeterButton.ContextMenu = _perimeterContextMenu;
-            _perimeterContextMenu.PlacementTarget = PerimeterButton;
-            _perimeterContextMenu.IsOpen = true;
-        }
-
         private void DrawPerimeter_Click(object sender, RoutedEventArgs e)
         {
             _isDrawingPartition = false;
@@ -507,18 +481,34 @@ namespace Winton.Views
                 _perimeterPoints.Clear();
                 _perimeterDots.Clear();
                 _perimeterLine.Points.Clear();
-                SalesFloorCanvas.Cursor = Cursors.Cross;
+                SalesFloorCanvas.Cursor = Cursors.Pen;
+                DrawPerimeterButton.Content = "◉ Drawing...";
             }
             else
             {
-                SalesFloorCanvas.Cursor = Cursors.Arrow;
+                StopPerimeterDrawing();
             }
         }
 
-        private void UndoPerimeter_Click(object sender, RoutedEventArgs e)
+        private void StopPerimeterDrawing()
         {
-            // Trigger partial undo while drawing.
+            _isDrawingPerimeter = false;
+            SalesFloorCanvas.Cursor = Cursors.Arrow;
+            _perimeterPreviewLine.Visibility = Visibility.Collapsed;
+            DrawPerimeterButton.Content = "Draw Perimeter";
+            UndoPerimeterButton.IsEnabled = false;
+            if (_perimeterDots.Any())
+                _perimeterDots.First().Fill = Brushes.Red;
+        }
+
+        private void UndoPerimeterButton_Click(object sender, RoutedEventArgs e)
+        {
             UndoPerimeterPoint();
+        }
+
+        private void ClearPerimeterButton_Click(object sender, RoutedEventArgs e)
+        {
+            ClearPerimeter_Click(sender, e);
         }
 
         private Partition RemovePartitionAssociatedWithShape(Shape shape)
@@ -544,6 +534,14 @@ namespace Winton.Views
         private async void EditableSalesFloor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (!_isEditMode) return;
+
+            // ----- ESCAPE: cancel active drawing -----
+            if (e.Key == Key.Escape)
+            {
+                if (_isDrawingPerimeter) StopPerimeterDrawing();
+                e.Handled = true;
+                return;
+            }
 
             // ----- COPY (Ctrl+C) -----
             if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
@@ -807,6 +805,27 @@ namespace Winton.Views
 
         #region Drawing Logic
 
+        private void SalesFloorCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isDrawingPerimeter || !_perimeterPoints.Any()) return;
+
+            Point pos = SnapToGrid(e.GetPosition(SalesFloorCanvas));
+            Point last = _perimeterPoints.Last();
+
+            _perimeterPreviewLine.X1 = last.X;
+            _perimeterPreviewLine.Y1 = last.Y;
+            _perimeterPreviewLine.X2 = pos.X;
+            _perimeterPreviewLine.Y2 = pos.Y;
+            _perimeterPreviewLine.Visibility = Visibility.Visible;
+
+            // Hint: highlight first dot green when cursor is near closing point
+            if (_perimeterDots.Any())
+            {
+                bool nearClose = _perimeterPoints.Count > 2 && IsCloseToFirstPerimeter(pos);
+                _perimeterDots.First().Fill = nearClose ? Brushes.LimeGreen : Brushes.Red;
+            }
+        }
+
         private void HandlePerimeterDrawing(Point clickedPoint)
         {
 
@@ -816,14 +835,14 @@ namespace Winton.Views
             var dot = CreateDot(clickedPoint, Brushes.Red);
             SalesFloorCanvas.Children.Add(dot);
             _perimeterDots.Add(dot);
+            UndoPerimeterButton.IsEnabled = true;
 
             // If the user closes the perimeter (clicking near the first point):
             if (_perimeterPoints.Count > 2 && IsCloseToFirstPerimeter(clickedPoint))
             {
                 // Close the shape visually.
                 _perimeterLine.Points.Add(_perimeterPoints.First());
-                _isDrawingPerimeter = false;
-                SalesFloorCanvas.Cursor = Cursors.Arrow;
+                StopPerimeterDrawing();
 
                 _ = SavePerimeterToDatabaseAsync();
                 ShowAutoSaved();
