@@ -75,7 +75,7 @@ namespace Winton.Views
         private readonly List<Ellipse> _partitionDots = new();
         private Polyline _partitionLine = new()
         {
-            Stroke = Brushes.Black,
+            Stroke = Brushes.SteelBlue,
             StrokeThickness = 2
         };
         private readonly Line _partitionPreviewLine = new()
@@ -823,8 +823,8 @@ namespace Winton.Views
                 }
             }
 
-            // Partition preview (polygon mode only — line mode doesn't need a trailing preview)
-            if (_isDrawingPartition && _polygonMode && _partitionPoints.Any())
+            // Partition preview — show in both Line mode (once first point is placed) and Polygon mode
+            if (_isDrawingPartition && _partitionPoints.Any())
             {
                 Point last = _partitionPoints.Last();
                 _partitionPreviewLine.X1 = last.X;
@@ -833,11 +833,11 @@ namespace Winton.Views
                 _partitionPreviewLine.Y2 = pos.Y;
                 _partitionPreviewLine.Visibility = Visibility.Visible;
 
-                // Snap-to-close hint: turn first dot green when near origin
-                if (_partitionDots.Any())
+                // Snap-to-close hint in polygon mode: turn first dot green when near origin
+                if (_polygonMode && _partitionDots.Any())
                 {
                     bool nearClose = _partitionPoints.Count > 2 && IsCloseToFirstPartition(pos);
-                    _partitionDots.First().Fill = nearClose ? Brushes.LimeGreen : Brushes.Blue;
+                    _partitionDots.First().Fill = nearClose ? Brushes.LimeGreen : Brushes.SteelBlue;
                 }
             }
             else
@@ -938,9 +938,12 @@ namespace Winton.Views
                 _partitions.Add(partition);
             }
 
+            // Remove drawing dots — they only show during active drawing
+            foreach (var dot in _partitionDots)
+                SalesFloorCanvas.Children.Remove(dot);
+
             var finalized = new FinalizedShape();
             finalized.Elements.Add(_partitionLine);
-            finalized.Elements.AddRange(_partitionDots);
             _finalizedShapes.Push(finalized);
 
             _partitionLine.Tag = "Partition";
@@ -952,7 +955,7 @@ namespace Winton.Views
 
             _partitionLine = new Polyline
             {
-                Stroke = Brushes.Black,
+                Stroke = Brushes.SteelBlue,
                 StrokeThickness = 2,
                 Tag = "Partition"
             };
@@ -1137,8 +1140,8 @@ namespace Winton.Views
             {
                 var partitionLine = new Polyline
                 {
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 1
+                    Stroke = Brushes.SteelBlue,
+                    StrokeThickness = 2
                 };
 
                 foreach (var pt in partition.Points)
@@ -1175,7 +1178,7 @@ namespace Winton.Views
                 if (!SalesFloorCanvas.Children.Contains(_partitionLine))
                     SalesFloorCanvas.Children.Add(_partitionLine);
 
-                SalesFloorCanvas.Cursor = Cursors.Cross;
+                SalesFloorCanvas.Cursor = Cursors.Pen;
                 FloorModeToggle.Visibility = Visibility.Visible;
             }
             else
