@@ -44,6 +44,9 @@ namespace Winton
         {
             StatusText.Text = "Checking for updates...";
 
+            // Lower Topmost so any update dialog can appear above the splash
+            Topmost = false;
+
             // Kick off update check (uses your existing GitHub release logic + prompts)
             var checker = new UpdateChecker();
             var updateTask = checker.AutoCheckOnStartupAsync(showNoUpdateToast: false, ct);
