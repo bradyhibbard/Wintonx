@@ -148,6 +148,9 @@ namespace Winton.Views
 
             if (AnyFilterActive())
                 _ = ApplyFiltersAsync();
+
+            if (_currentSectionId != null)
+                await RefreshDrawerStatsAsync();
         }
 
         // ─── KPI bar ──────────────────────────────────────────────────────────
@@ -364,8 +367,19 @@ namespace Winton.Views
             var section  = sections.FirstOrDefault(s => s.sectionId == sectionId);
             DrawerSectionName.Text = string.IsNullOrWhiteSpace(section.name) ? sectionId : section.name;
 
-            // Stats for selected period
-            decimal revenue  = await SalesDataServices.GetRevenueBySectionAsync(sectionId, _periodStart, _periodEnd);
+            await RefreshDrawerStatsAsync();
+
+            // Default product search shows all (empty filters)
+            FilterDrawerProducts();
+
+            AnimateDrawer(open: true);
+        }
+
+        private async Task RefreshDrawerStatsAsync()
+        {
+            var sectionId = _currentSectionId;
+
+            decimal revenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, _periodStart, _periodEnd);
             DrawerRevenue.Text = revenue.ToString("C0");
 
             var qtyMap = await SalesDataServices.GetQuantityBySectionAsync(_periodStart, _periodEnd);
@@ -374,14 +388,9 @@ namespace Winton.Views
             var products = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
             DrawerProductCount.Text = products.Count.ToString();
 
-            // Products currently in this section
+            DrawerCurrentProductsListBox.Items.Clear();
             foreach (var p in products)
                 DrawerCurrentProductsListBox.Items.Add(p.ItemNumber);
-
-            // Default product search shows all (empty filters)
-            FilterDrawerProducts();
-
-            AnimateDrawer(open: true);
         }
 
         private void CloseSectionDrawer()
@@ -468,8 +477,7 @@ namespace Winton.Views
             foreach (var itemNumber in selected)
                 await ProductPlacementServices.PlaceProductAsync(itemNumber, _currentSectionId);
 
-            // Refresh drawer, KPIs, and heat map
-            await OpenSectionDrawerAsync(_currentSectionId);
+            await RefreshDrawerStatsAsync();
             await RefreshKpisAsync();
             await ApplyHeatMapAsync();
         }
@@ -534,7 +542,7 @@ namespace Winton.Views
                 }
             }
 
-            await OpenSectionDrawerAsync(_currentSectionId);
+            await RefreshDrawerStatsAsync();
             await RefreshKpisAsync();
             await ApplyHeatMapAsync();
         }
