@@ -15,6 +15,7 @@ namespace Winton
     public partial class MainWindow : Window
     {
         private EditableSalesFloor _salesFloor;
+        private Button _activeNavBtn;
 
         public MainWindow()
         {
@@ -34,7 +35,16 @@ namespace Winton
             await DatabaseService.InitializeDatabaseAsync();
             Debug.WriteLine($"Using DB path: {Path.GetFullPath(DatabaseConfig.DbPath)}");
 
-            MainContent.Content = new Dashboard();  // Load Dashboard after DB initializes
+            MainContent.Content = new Dashboard();
+            SetActiveNav(DashboardButton);
+        }
+
+        private void SetActiveNav(Button clicked)
+        {
+            if (_activeNavBtn != null)
+                _activeNavBtn.Tag = null;
+            _activeNavBtn = clicked;
+            clicked.Tag = "Active";
         }
 
         // -----------------------------------------------------------
@@ -109,37 +119,40 @@ namespace Winton
 
         private void Dashboard_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNav((Button)sender);
             MainContent.Content = new Dashboard();
         }
 
         private void SalesFloor_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNav((Button)sender);
             MainContent.Content = new LiveSalesFloor();
         }
 
         private void ProductList_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNav((Button)sender);
             MainContent.Content = new ProductListControl();
         }
 
         private void Reports_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNav((Button)sender);
             MainContent.Content = new ReportsListControl();
         }
 
         private void DB_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNav((Button)sender);
             MainContent.Content = new DBControl();
         }
 
         private void Canvas_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNav((Button)sender);
             if (_salesFloor == null)
-            {
                 _salesFloor = new EditableSalesFloor();
-            }
-
-            MainContent.Content = _salesFloor; // Ensure we always reuse same instance
+            MainContent.Content = _salesFloor;
         }
 
         public EditableSalesFloor SalesFloorInstance
