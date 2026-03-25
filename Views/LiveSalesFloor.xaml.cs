@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -19,42 +19,47 @@ namespace Winton.Views
 {
     public partial class LiveSalesFloor : UserControl
     {
-        private List<Product> _allProducts;
+        // ─── State ────────────────────────────────────────────────────────────
+        private List<Product> _allProducts = new();
         private string _currentSectionId = null;
-        private bool _isFilterPanelOpen = false;
-        private bool _isProductPanelOpen = false;
-        private double _filterPanelWidth => ActualWidth * 0.3;
-        private double _productPanelWidth => ActualWidth * 0.3;
+        private DateTime _periodStart;
+        private DateTime _periodEnd;
+        private bool _heatByRevenue = true;
+
         private SectionManager _sectionManager;
-        private Polyline _perimeterLine = new Polyline { Stroke = Brushes.Black, StrokeThickness = 2 };
+        private Polyline _perimeterLine = new() { Stroke = Brushes.Black, StrokeThickness = 2 };
         private Action<string> _sectionSelectedHandler;
 
-        // ✅ Debounce timers for filters
-        private DispatcherTimer _filterPanelDebounceTimer;
-        private DispatcherTimer _productPanelDebounceTimer;
+        // ─── Debounce timers ──────────────────────────────────────────────────
+        private DispatcherTimer _filterDebounce;
+        private DispatcherTimer _drawerFilterDebounce;
 
+        // ─── Constructor ──────────────────────────────────────────────────────
         public LiveSalesFloor()
         {
             InitializeComponent();
+
             _sectionManager = new SectionManager(LiveFloorCanvas, this);
-            Loaded += LiveSalesFloor_Loaded;
-            Unloaded += LiveSalesFloor_Unloaded;
 
-            _sectionSelectedHandler = async sectionId => await LoadSectionDetails(sectionId);
+            // Initialise date range before any UI handlers fire
+            SetDateRange("This Month");
+
+            _sectionSelectedHandler = sectionId => _ = OpenSectionDrawerAsync(sectionId);
             _sectionManager.SectionSelected += _sectionSelectedHandler;
+
+            Loaded   += async (s, e) => await InitializeAsync();
+            Unloaded += (s, e)       => _sectionManager.SectionSelected -= _sectionSelectedHandler;
         }
 
-        private void LiveSalesFloor_Unloaded(object sender, RoutedEventArgs e)
-        {
-            _sectionManager.SectionSelected -= _sectionSelectedHandler;
-        }
-
-        private async void LiveSalesFloor_Loaded(object sender, RoutedEventArgs e)
+        // ─── Initialisation ───────────────────────────────────────────────────
+        private async Task InitializeAsync()
         {
             _allProducts = await ProductService.GetProductsAsync();
             await LoadSectionsAsync();
             await LoadPerimeterAsync();
             await LoadPartitionsAsync();
+            await RefreshKpisAsync();
+            await ApplyHeatMapAsync();
         }
 
         private async Task LoadSectionsAsync()
@@ -74,47 +79,26 @@ namespace Winton.Views
                     existingSectionId: section.sectionId,
                     wrapAsButton: true);
 
-                // Find the button after it's added to the canvas
                 var button = LiveFloorCanvas.Children.OfType<Button>()
-                                                     .FirstOrDefault(b => b.Tag as string == section.sectionId);
+                    .FirstOrDefault(b => b.Tag as string == section.sectionId);
 
                 if (button != null)
                 {
-                    button.Focusable = true;
-                    button.PreviewMouseDoubleClick += Section_MouseDoubleClick;
+                    button.Focusable = false;
+                    button.Click += Section_Click;
                 }
             }
         }
-
-        private void Section_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            e.Handled = true;
-
-            if (sender is Button sectionButton && sectionButton.Tag is string sectionId)
-            {
-                _currentSectionId = sectionId;
-
-                // Load the section data
-                _ = LoadSectionDetails(sectionId);
-
-                // Open the Add Product Panel
-                ToggleProductPanel(true);
-            }
-        }
-
 
         private async Task LoadPerimeterAsync()
         {
             var points = await CanvasService.LoadPerimeterAsync();
             _perimeterLine.Points.Clear();
             foreach (var pt in points)
-            {
                 _perimeterLine.Points.Add(pt);
-            }
+
             if (!LiveFloorCanvas.Children.Contains(_perimeterLine))
-            {
                 LiveFloorCanvas.Children.Add(_perimeterLine);
-            }
         }
 
         private async Task LoadPartitionsAsync()
@@ -124,698 +108,506 @@ namespace Winton.Views
             {
                 var polyline = new Polyline { Stroke = Brushes.DarkGray, StrokeThickness = 1.5 };
                 foreach (var point in partition.Points)
-                {
                     polyline.Points.Add(point);
-                }
                 LiveFloorCanvas.Children.Add(polyline);
             }
         }
 
-        private void ToggleProductPanel(bool open)
+        // ─── Date range ───────────────────────────────────────────────────────
+        private void DateRangeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if(open && _isFilterPanelOpen)
-                ToggleFilterPanel(false);
+            if (DateRangeCombo.SelectedItem is ComboBoxItem item)
+                SetDateRange(item.Content?.ToString());
 
-            _isProductPanelOpen = open;
-            AnimatePanel(ProductPanelColumn, ProductPanel, open, _productPanelWidth);
+            _ = RefreshAllAsync();
         }
 
-        private void AnimatePanel(ColumnDefinition column, FrameworkElement panel, bool open, double targetWidth)
+        private void SetDateRange(string preset)
         {
-            GridLengthAnimation animation = new GridLengthAnimation
+            _periodEnd   = DateTime.Today;
+            _periodStart = preset switch
             {
-                From = new GridLength(column.Width.Value, GridUnitType.Pixel),
-                To = open ? new GridLength(targetWidth, GridUnitType.Pixel) : new GridLength(0, GridUnitType.Pixel),
-                Duration = new Duration(TimeSpan.FromMilliseconds(300)),
-                FillBehavior = FillBehavior.HoldEnd
+                "Last 7 Days"   => _periodEnd.AddDays(-7),
+                "This Month"    => new DateTime(_periodEnd.Year, _periodEnd.Month, 1),
+                "Last 30 Days"  => _periodEnd.AddDays(-30),
+                "This Quarter"  => new DateTime(_periodEnd.Year, ((_periodEnd.Month - 1) / 3) * 3 + 1, 1),
+                "Year to Date"  => new DateTime(_periodEnd.Year, 1, 1),
+                _               => _periodEnd.AddMonths(-1)
             };
 
-            animation.Completed += (s, e) =>
-            {
-                panel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            };
-
-            if (open)
-                panel.Visibility = Visibility.Visible;
-
-            column.BeginAnimation(ColumnDefinition.WidthProperty, animation);
+            string label = preset ?? "Period";
+            if (KpiRevenuePeriod != null) KpiRevenuePeriod.Text = label;
+            if (KpiUnitsPeriod   != null) KpiUnitsPeriod.Text   = label;
         }
 
-        private void AddProducts_Click(object sender, RoutedEventArgs e)
+        private async Task RefreshAllAsync()
         {
-            ToggleProductPanel(!_isProductPanelOpen);
+            await RefreshKpisAsync();
+            await ApplyHeatMapAsync();
+
+            if (AnyFilterActive())
+                _ = ApplyFiltersAsync();
         }
 
-        private void ToggleFilterPanel(bool open)
+        // ─── KPI bar ──────────────────────────────────────────────────────────
+        private async Task RefreshKpisAsync()
         {
-            if (open && _isProductPanelOpen)
-                ToggleProductPanel(false);
-
-            _isFilterPanelOpen = open;
-
-            GridLengthAnimation animation = new GridLengthAnimation
+            try
             {
-                From = new GridLength(FilterPanelColumn.Width.Value, GridUnitType.Pixel),
-                To = open ? new GridLength(_filterPanelWidth, GridUnitType.Pixel) : new GridLength(0, GridUnitType.Pixel),
-                Duration = new Duration(TimeSpan.FromMilliseconds(300)),
-                FillBehavior = FillBehavior.HoldEnd
-            };
+                var revenueMap = await SalesDataServices.GetRevenueDataAsync(_periodStart, _periodEnd);
+                KpiRevenue.Text  = revenueMap.Values.Sum().ToString("C0");
+                KpiSections.Text = revenueMap.Count(kv => kv.Value > 0).ToString();
 
-            animation.Completed += (s, e) =>
-            {
-                FilterPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            };
-
-            if (open)
-                FilterPanel.Visibility = Visibility.Visible;
-
-            FilterPanelColumn.BeginAnimation(ColumnDefinition.WidthProperty, animation);
-        }
-
-        // ✅ Debounce helper to avoid filtering on every keystroke
-        private void DebounceFilter(Action action, ref DispatcherTimer timer, int delayMs = 250)
-        {
-            if (timer == null)
-            {
-                timer = new DispatcherTimer();
-                timer.Interval = TimeSpan.FromMilliseconds(delayMs);
-
-                var localTimer = timer;
-
-                localTimer.Tick += (s, e) =>
-                {
-                    localTimer.Stop();
-                    action();
-                };
+                var qtyMap = await SalesDataServices.GetQuantityBySectionAsync(_periodStart, _periodEnd);
+                KpiUnits.Text = qtyMap.Values.Sum().ToString("N0");
             }
-
-            timer.Stop();
-            timer.Start();
-        }
-
-
-
-        // PRODUCT PANEL METHODS
-        private void ProductVendorTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
-
-        private void ProductCategoryTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
-
-        private void ProductGroupTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
-
-        private void ProductProductTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProductPanel, ref _productPanelDebounceTimer);
-
-        private void FilterProductPanel()
-        {
-            var vendorInput = ProductVendorTextBox.Text.ToLower();
-            var categoryInput = ProductCategoryTextBox.Text.ToLower();
-            var groupInput = ProductGroupTextBox.Text.ToLower();
-            var productInput = AddProductTextBox.Text.ToLower();
-
-            var filteredProducts = _allProducts
-                .Where(p => (string.IsNullOrEmpty(vendorInput) || p.Vendor.ToLower().Contains(vendorInput)) &&
-                            (string.IsNullOrEmpty(categoryInput) || p.Cat.ToLower().Contains(categoryInput)) &&
-                            (string.IsNullOrEmpty(groupInput) || p.Grp.ToLower().Contains(groupInput)) &&
-                            (string.IsNullOrEmpty(productInput) || p.ItemNumber.ToLower().Contains(productInput)))
-                .OrderBy(p => p.ItemNumber)
-                .ToList();
-
-            UpdateFilteredProductsList(filteredProducts);
-        }
-
-        private void Filters_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleFilterPanel(!_isFilterPanelOpen);
-        }
-
-        // FILTER PANEL METHODS (now debounced)
-        private void VendorTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
-
-        private void CategoryTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
-
-        private void GroupTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
-
-        private void ProductTextBox_TextChanged(object sender, TextChangedEventArgs e)
-            => DebounceFilter(FilterProducts, ref _filterPanelDebounceTimer);
-
-        private void FilterProducts()
-        {
-            var vendorInput = VendorTextBox.Text.ToLower();
-            var categoryInput = CategoryTextBox.Text.ToLower();
-            var groupInput = GroupTextBox.Text.ToLower();
-            var productInput = ProductTextBox.Text.ToLower();
-
-            var filteredProducts = _allProducts
-                .Where(p => (string.IsNullOrEmpty(vendorInput) || p.Vendor.ToLower().Contains(vendorInput)) &&
-                            (string.IsNullOrEmpty(categoryInput) || p.Cat.ToLower().Contains(categoryInput)) &&
-                            (string.IsNullOrEmpty(groupInput) || p.Grp.ToLower().Contains(groupInput)) &&
-                            (string.IsNullOrEmpty(productInput) || p.ItemNumber.ToLower().Contains(productInput)))
-                .OrderBy(p => p.ItemNumber)
-                .ToList();
-
-            UpdateFilteredProductsList(filteredProducts);
-
-            // ✅ Skip heavy DB + overlay work if there is no actual filter input
-            bool anyInput = !(string.IsNullOrEmpty(vendorInput) &&
-                              string.IsNullOrEmpty(categoryInput) &&
-                              string.IsNullOrEmpty(groupInput) &&
-                              string.IsNullOrEmpty(productInput));
-
-            if (!anyInput)
+            catch (Exception ex)
             {
-                ClearHighlights();
-                RevenueOverlayCanvas.Children.Clear();
+                Debug.WriteLine($"[LiveSalesFloor] RefreshKpisAsync: {ex}");
+            }
+        }
+
+        // ─── Heat map ─────────────────────────────────────────────────────────
+        private async Task ApplyHeatMapAsync()
+        {
+            try
+            {
+                Dictionary<string, decimal> valueMap;
+
+                if (_heatByRevenue)
+                {
+                    valueMap = await SalesDataServices.GetRevenueDataAsync(_periodStart, _periodEnd);
+                }
+                else
+                {
+                    var qtyMap = await SalesDataServices.GetQuantityBySectionAsync(_periodStart, _periodEnd);
+                    valueMap = qtyMap.ToDictionary(
+                        kv => kv.Key,
+                        kv => (decimal)kv.Value,
+                        StringComparer.OrdinalIgnoreCase);
+                }
+
+                decimal maxVal = valueMap.Count > 0 ? valueMap.Values.Max() : 0;
+
+                foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+                {
+                    if (btn.Tag is not string sectionId) continue;
+
+                    decimal val = valueMap.GetValueOrDefault(sectionId, 0m);
+                    var heat    = GetHeatColor(val, maxVal);
+
+                    if (btn.Content is Shape shape)
+                        shape.Fill = new SolidColorBrush(heat);
+
+                    btn.Opacity = 1.0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[LiveSalesFloor] ApplyHeatMapAsync: {ex}");
+            }
+        }
+
+        private static Color GetHeatColor(decimal value, decimal max)
+        {
+            if (max <= 0 || value <= 0)
+                return Color.FromRgb(70, 70, 75); // gray: no data
+
+            double t = Math.Min(1.0, (double)(value / max));
+
+            return t < 0.5
+                ? LerpColor(Color.FromRgb(42, 82, 152),   Color.FromRgb(245, 166, 35), t * 2)
+                : LerpColor(Color.FromRgb(245, 166, 35),  Color.FromRgb(52,  199, 89),  (t - 0.5) * 2);
+        }
+
+        private static Color LerpColor(Color a, Color b, double t) =>
+            Color.FromRgb(
+                (byte)(a.R + (b.R - a.R) * t),
+                (byte)(a.G + (b.G - a.G) * t),
+                (byte)(a.B + (b.B - a.B) * t));
+
+        // ─── Color mode toggle ────────────────────────────────────────────────
+        private void ColorMode_Changed(object sender, RoutedEventArgs e)
+        {
+            _heatByRevenue = RevenueModeBtn.IsChecked == true;
+            _ = ApplyHeatMapAsync();
+        }
+
+        // ─── Floor filters ────────────────────────────────────────────────────
+        private void FilterInput_Changed(object sender, TextChangedEventArgs e)
+        {
+            UpdateFilterChips();
+            Debounce(ref _filterDebounce, () => _ = ApplyFiltersAsync());
+        }
+
+        private bool AnyFilterActive() =>
+            !string.IsNullOrWhiteSpace(VendorFilter.Text)   ||
+            !string.IsNullOrWhiteSpace(CategoryFilter.Text) ||
+            !string.IsNullOrWhiteSpace(GroupFilter.Text)    ||
+            !string.IsNullOrWhiteSpace(ProductFilter.Text);
+
+        private async Task ApplyFiltersAsync()
+        {
+            if (!AnyFilterActive())
+            {
+                await ApplyHeatMapAsync();
                 return;
             }
 
-            _ = HighlightForFilteredProductsAsync(filteredProducts);
-        }
+            var vendor   = VendorFilter.Text.Trim().ToLowerInvariant();
+            var category = CategoryFilter.Text.Trim().ToLowerInvariant();
+            var group    = GroupFilter.Text.Trim().ToLowerInvariant();
+            var product  = ProductFilter.Text.Trim().ToLowerInvariant();
 
-        private void UpdateFilteredProductsList(List<Product> products)
-        {
-            FilteredProductsListBox.Items.Clear();
+            var filtered = _allProducts
+                .Where(p =>
+                    (string.IsNullOrEmpty(vendor)   || p.Vendor.ToLowerInvariant().Contains(vendor))   &&
+                    (string.IsNullOrEmpty(category) || p.Cat.ToLowerInvariant().Contains(category))    &&
+                    (string.IsNullOrEmpty(group)    || p.Grp.ToLowerInvariant().Contains(group))       &&
+                    (string.IsNullOrEmpty(product)  || p.ItemNumber.ToLowerInvariant().Contains(product)))
+                .ToList();
 
-            foreach (var product in products)
+            if (filtered.Count == 0)
             {
-                var checkbox = new CheckBox
-                {
-                    Content = product.ItemNumber,
-                    IsChecked = false
-                };
-
-                FilteredProductsListBox.Items.Add(checkbox);
-            }
-        }
-
-        private void SelectAllCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            foreach (CheckBox checkbox in FilteredProductsListBox.Items)
-            {
-                checkbox.IsChecked = true;
-            }
-        }
-
-        private void SelectAllCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            foreach (CheckBox checkbox in FilteredProductsListBox.Items)
-            {
-                checkbox.IsChecked = false;
-            }
-        }
-
-        private async void AddProductButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(_currentSectionId))
-            {
-                MessageBox.Show("No section selected. Please select a section first.");
+                foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+                    btn.Opacity = 0.2;
                 return;
             }
 
-            var selectedProducts = FilteredProductsListBox.Items.Cast<CheckBox>()
+            var itemNumbers = filtered
+                .Select(p => p.ItemNumber)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var matchingIds = await ProductPlacementServices.GetSectionIdsForItemNumbersAsync(itemNumbers);
+
+            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+            {
+                var id    = btn.Tag as string;
+                bool match = !string.IsNullOrEmpty(id) && matchingIds.Contains(id);
+                btn.Opacity = match ? 1.0 : 0.15;
+            }
+        }
+
+        // ─── Filter chips ─────────────────────────────────────────────────────
+        private void UpdateFilterChips()
+        {
+            FilterChipsPanel.Children.Clear();
+            AddChipIfNeeded("Vendor",   VendorFilter);
+            AddChipIfNeeded("Category", CategoryFilter);
+            AddChipIfNeeded("Group",    GroupFilter);
+            AddChipIfNeeded("Item #",   ProductFilter);
+            FilterChipsPanel.Visibility = FilterChipsPanel.Children.Count > 0
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void AddChipIfNeeded(string label, TextBox box)
+        {
+            if (string.IsNullOrWhiteSpace(box.Text)) return;
+
+            var closeBtn = new Button
+            {
+                Content         = "✕",
+                Background      = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Foreground      = Brushes.White,
+                FontSize        = 10,
+                Padding         = new Thickness(5, 0, 0, 0),
+                Cursor          = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Tag             = box
+            };
+            closeBtn.Click += (s, _) => ((TextBox)((Button)s).Tag).Clear();
+
+            FilterChipsPanel.Children.Add(new Border
+            {
+                Background    = (Brush)TryFindResource("Accent"),
+                CornerRadius  = new CornerRadius(12),
+                Padding       = new Thickness(10, 4, 6, 4),
+                Margin        = new Thickness(0, 0, 6, 4),
+                Child         = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children    =
+                    {
+                        new TextBlock
+                        {
+                            Text = $"{label}: {box.Text}",
+                            Foreground = Brushes.White,
+                            FontSize   = 11,
+                            VerticalAlignment = VerticalAlignment.Center
+                        },
+                        closeBtn
+                    }
+                }
+            });
+        }
+
+        // ─── Section click → drawer ───────────────────────────────────────────
+        private void Section_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string sectionId)
+                _ = OpenSectionDrawerAsync(sectionId);
+        }
+
+        // ─── Section drawer ───────────────────────────────────────────────────
+        private async Task OpenSectionDrawerAsync(string sectionId)
+        {
+            _currentSectionId = sectionId;
+
+            // Reset search filters and lists
+            DrawerVendorFilter.Text   = "";
+            DrawerCategoryFilter.Text = "";
+            DrawerProductFilter.Text  = "";
+            DrawerProductsListBox.Items.Clear();
+            DrawerCurrentProductsListBox.Items.Clear();
+            DrawerDatePicker.SelectedDate = null;
+
+            // Section name
+            var sections = await CanvasService.LoadSectionsAsync();
+            var section  = sections.FirstOrDefault(s => s.sectionId == sectionId);
+            DrawerSectionName.Text = string.IsNullOrWhiteSpace(section.name) ? sectionId : section.name;
+
+            // Stats for selected period
+            decimal revenue  = await SalesDataServices.GetRevenueBySectionAsync(sectionId, _periodStart, _periodEnd);
+            DrawerRevenue.Text = revenue.ToString("C0");
+
+            var products = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
+            DrawerQty.Text          = products.Sum(p => p.QuantitySold).ToString("N0");
+            DrawerProductCount.Text = products.Count.ToString();
+
+            // Products currently in this section
+            foreach (var p in products)
+                DrawerCurrentProductsListBox.Items.Add(p.ItemNumber);
+
+            // Default product search shows all (empty filters)
+            FilterDrawerProducts();
+
+            AnimateDrawer(open: true);
+        }
+
+        private void CloseSectionDrawer()
+        {
+            _currentSectionId = null;
+            AnimateDrawer(open: false);
+        }
+
+        private void AnimateDrawer(bool open)
+        {
+            double to = open ? 0 : 320;
+            DrawerSlideTransform.BeginAnimation(
+                TranslateTransform.XProperty,
+                new DoubleAnimation(to, TimeSpan.FromMilliseconds(open ? 250 : 200))
+                {
+                    EasingFunction = new CubicEase
+                    {
+                        EasingMode = open ? EasingMode.EaseOut : EasingMode.EaseIn
+                    }
+                });
+        }
+
+        private void CloseDrawer_Click(object sender, RoutedEventArgs e) => CloseSectionDrawer();
+
+        // ─── Drawer product search ─────────────────────────────────────────────
+        private void DrawerFilter_Changed(object sender, TextChangedEventArgs e)
+            => Debounce(ref _drawerFilterDebounce, FilterDrawerProducts);
+
+        private void FilterDrawerProducts()
+        {
+            var vendor   = DrawerVendorFilter.Text.Trim().ToLowerInvariant();
+            var category = DrawerCategoryFilter.Text.Trim().ToLowerInvariant();
+            var product  = DrawerProductFilter.Text.Trim().ToLowerInvariant();
+
+            var filtered = _allProducts
+                .Where(p =>
+                    (string.IsNullOrEmpty(vendor)   || p.Vendor.ToLowerInvariant().Contains(vendor))   &&
+                    (string.IsNullOrEmpty(category) || p.Cat.ToLowerInvariant().Contains(category))    &&
+                    (string.IsNullOrEmpty(product)  || p.ItemNumber.ToLowerInvariant().Contains(product)))
+                .Take(200)
+                .ToList();
+
+            DrawerSelectAll.IsChecked = false;
+            DrawerProductsListBox.Items.Clear();
+
+            foreach (var p in filtered)
+                DrawerProductsListBox.Items.Add(new CheckBox
+                {
+                    Content    = p.ItemNumber,
+                    Foreground = (Brush)TryFindResource("PrimaryText"),
+                    IsChecked  = false
+                });
+        }
+
+        private void DrawerSelectAll_Checked(object sender, RoutedEventArgs e)
+        {
+            foreach (CheckBox cb in DrawerProductsListBox.Items)
+                cb.IsChecked = true;
+        }
+
+        private void DrawerSelectAll_Unchecked(object sender, RoutedEventArgs e)
+        {
+            foreach (CheckBox cb in DrawerProductsListBox.Items)
+                cb.IsChecked = false;
+        }
+
+        // ─── Drawer: Add products ─────────────────────────────────────────────
+        private async void DrawerAddProducts_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_currentSectionId)) return;
+
+            var selected = DrawerProductsListBox.Items.Cast<CheckBox>()
                 .Where(cb => cb.IsChecked == true)
                 .Select(cb => cb.Content.ToString())
                 .ToList();
 
-            if (!selectedProducts.Any())
+            if (!selected.Any())
             {
-                MessageBox.Show("No products selected.");
+                MessageBox.Show("No products selected.", "Add Products",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            foreach (var productId in selectedProducts)
-            {
-                await ProductPlacementServices.PlaceProductAsync(productId, _currentSectionId);
-            }
+            foreach (var itemNumber in selected)
+                await ProductPlacementServices.PlaceProductAsync(itemNumber, _currentSectionId);
 
-            MessageBox.Show("Products added successfully: " + string.Join(", ", selectedProducts));
-
-            // Refresh the Added Products List
-            await LoadAddedProducts(_currentSectionId);
+            // Refresh drawer, KPIs, and heat map
+            await OpenSectionDrawerAsync(_currentSectionId);
+            await RefreshKpisAsync();
+            await ApplyHeatMapAsync();
         }
 
-        private async Task LoadSectionDetails(string sectionId)
+        // ─── Drawer: Current products ─────────────────────────────────────────
+        private async void DrawerCurrentProducts_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            _currentSectionId = sectionId;
-
-            var sections = await CanvasService.LoadSectionsAsync();
-            var section = sections.FirstOrDefault(s => s.sectionId == sectionId);
-
-            if (!string.IsNullOrEmpty(section.sectionId))
+            if (DrawerCurrentProductsListBox.SelectedItem is string itemNumber)
             {
-                SectionIdTextBox.Text = section.name;
-
-                await LoadAddedProducts(sectionId);
-            }
-        }
-
-        private async Task LoadAddedProducts(string sectionId)
-        {
-            // Clear the list to avoid duplicates
-            AddedProductsListBox.Items.Clear();
-
-            if (string.IsNullOrEmpty(sectionId))
-                return;
-
-            try
-            {
-                var productsInSection = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
-
-                foreach (var product in productsInSection)
-                {
-                    AddedProductsListBox.Items.Add(product.ItemNumber);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[LiveSalesFloor] LoadAddedProducts: {ex}");
-            }
-        }
-
-        private async void SectionIdTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (!string.IsNullOrEmpty(_currentSectionId) && !string.IsNullOrEmpty(SectionIdTextBox.Text))
-            {
-                string newName = SectionIdTextBox.Text;
-
-                try
-                {
-                    await CanvasService.UpdateSectionNameAsync(_currentSectionId, newName);
-                    Debug.WriteLine($"[LiveSalesFloor] Section name updated to: {newName}");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[LiveSalesFloor] UpdateSectionName: {ex}");
-                }
-            }
-        }
-
-        private async void RemoveProductButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(_currentSectionId))
-            {
-                MessageBox.Show("No section selected. Please select a section first.");
-                return;
-            }
-
-            var selectedProducts = AddedProductsListBox.SelectedItems.Cast<string>().ToList();
-
-            if (!selectedProducts.Any())
-            {
-                MessageBox.Show("No products selected for removal.");
-                return;
-            }
-
-            try
-            {
-                foreach (var itemNumber in selectedProducts)
-                {
-                    var productPlacement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
-
-                    if (productPlacement != null && productPlacement.SectionID == _currentSectionId)
-                    {
-                        DateTime removalDate = DateTime.Now;
-
-                        // Update DateRemoved before archiving
-                        await ProductPlacementServices.RemoveProductFromSectionAsync(
-                            productPlacement.ProductID,
-                            _currentSectionId,
-                            removalDate
-                        );
-
-                        // Archive the product placement
-                        await ProductPlacementServices.ArchiveProductPlacementAsync(
-                            productId: productPlacement.ProductID,
-                            sectionId: _currentSectionId,
-                            removalNotes: "Removed manually",
-                            quantitySold: productPlacement.QuantitySold,
-                            revenue: productPlacement.Revenue
-                        );
-                    }
-                }
-
-                MessageBox.Show("Selected products removed and archived successfully.");
-
-                // Refresh the Added Products List
-                await LoadAddedProducts(_currentSectionId);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[LiveSalesFloor] RemoveProductButton_Click: {ex}");
-            }
-        }
-
-        private async void DateAddedPicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (AddedProductsListBox.SelectedItem is string itemNumber && DateAddedPicker.SelectedDate.HasValue)
-            {
-                DateTime newDateAdded = DateAddedPicker.SelectedDate.Value;
-
-                var productPlacement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
-
-                if (productPlacement != null)
-                {
-                    try
-                    {
-                        await ProductPlacementServices.UpdateDatePlacedAsync(productPlacement.ProductID, _currentSectionId, newDateAdded);
-                        Debug.WriteLine($"[LiveSalesFloor] DateAdded updated for {itemNumber}: {newDateAdded}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[LiveSalesFloor] UpdateDateAdded: {ex}");
-                    }
-                }
-            }
-        }
-
-        private async void AddedProductsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (AddedProductsListBox.SelectedItem is string itemNumber)
-            {
-                var productPlacement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
-
-                if (productPlacement != null)
-                {
-                    DateAddedPicker.SelectedDate = productPlacement.DatePlaced;
-                }
-                else
-                {
-                    DateAddedPicker.SelectedDate = null; // Clear the DatePicker if no valid product is found
-                }
+                var placement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
+                DrawerDatePicker.SelectedDate = placement?.DatePlaced;
             }
             else
             {
-                DateAddedPicker.SelectedDate = null; // Clear the DatePicker if no product is selected
+                DrawerDatePicker.SelectedDate = null;
             }
         }
 
-        private void ViewSectionArchive_Click(object sender, RoutedEventArgs e)
+        private async void DrawerDatePicker_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_currentSectionId))
+            if (DrawerCurrentProductsListBox.SelectedItem is string itemNumber &&
+                DrawerDatePicker.SelectedDate.HasValue &&
+                !string.IsNullOrEmpty(_currentSectionId))
             {
-                MessageBox.Show("No section selected.");
-                return;
-            }
-
-            var archiveWindow = new SectionArchiveWindow(_currentSectionId);
-            archiveWindow.Show();
-        }
-
-        // Highlighting the Filtered Products
-
-        private void ClearHighlights()
-        {
-            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
-            {
-                btn.Opacity = 1.0;
-
-                // If Button wraps a Shape, reset stroke
-                if (btn.Content is Shape shape)
+                var placement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
+                if (placement != null)
                 {
-                    shape.Stroke = Brushes.Black;
-                    shape.StrokeThickness = 2;
+                    await ProductPlacementServices.UpdateDatePlacedAsync(
+                        placement.ProductID, _currentSectionId, DrawerDatePicker.SelectedDate.Value);
+                    Debug.WriteLine($"[LiveSalesFloor] DatePlaced updated: {itemNumber} → {DrawerDatePicker.SelectedDate.Value:d}");
                 }
             }
         }
 
-        private void HighlightSections(HashSet<string> matchingSectionIds)
+        // ─── Drawer: Remove products ──────────────────────────────────────────
+        private async void DrawerRemoveProduct_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
-            {
-                var sectionId = btn.Tag as string;
+            if (string.IsNullOrEmpty(_currentSectionId)) return;
 
-                if (!string.IsNullOrEmpty(sectionId) && matchingSectionIds.Contains(sectionId))
+            var selected = DrawerCurrentProductsListBox.SelectedItems.Cast<string>().ToList();
+            if (!selected.Any())
+            {
+                MessageBox.Show("No products selected for removal.", "Remove Products",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            foreach (var itemNumber in selected)
+            {
+                var placement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
+                if (placement != null && placement.SectionID == _currentSectionId)
                 {
-                    // MATCH: brighten + bold stroke
-                    btn.Opacity = 1.0;
-                    if (btn.Content is Shape shape)
-                    {
-                        shape.Stroke = Brushes.DeepSkyBlue;
-                        shape.StrokeThickness = 3;
-                    }
-                }
-                else
-                {
-                    // NON-MATCH: dim + reset stroke
-                    btn.Opacity = 0.3;
-                    if (btn.Content is Shape shape)
-                    {
-                        shape.Stroke = Brushes.Black;
-                        shape.StrokeThickness = 2;
-                    }
+                    await ProductPlacementServices.RemoveProductFromSectionAsync(
+                        placement.ProductID, _currentSectionId, DateTime.Now);
+
+                    await ProductPlacementServices.ArchiveProductPlacementAsync(
+                        productId:     placement.ProductID,
+                        sectionId:     _currentSectionId,
+                        removalNotes:  "Removed manually",
+                        quantitySold:  placement.QuantitySold,
+                        revenue:       placement.Revenue);
                 }
             }
+
+            await OpenSectionDrawerAsync(_currentSectionId);
+            await RefreshKpisAsync();
+            await ApplyHeatMapAsync();
         }
 
-        private void DimAllSections_NoResults()
+        // ─── Drawer: Archive ──────────────────────────────────────────────────
+        private void DrawerViewArchive_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
-            {
-                btn.Opacity = 0.3;
-                if (btn.Content is Shape shape)
-                {
-                    shape.Stroke = Brushes.Black;
-                    shape.StrokeThickness = 2;
-                }
-            }
+            if (string.IsNullOrEmpty(_currentSectionId)) return;
+            new SectionArchiveWindow(_currentSectionId).Show();
         }
 
-        private async Task HighlightForFilteredProductsAsync(List<Product> filteredProducts)
+        // ─── Drawer: Full Analytics ───────────────────────────────────────────
+        private void DrawerViewFullAnalytics_Click(object sender, RoutedEventArgs e)
         {
-
-            // If the section detail overlay is open, don't draw / intercept anything underneath.
-            if (SectionDetailOverlay.Visibility == Visibility.Visible)
-            {
-                RevenueOverlayCanvas.Children.Clear();
-                RevenueOverlayCanvas.IsHitTestVisible = false;
-                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            var vendorInput = VendorTextBox.Text?.Trim();
-            var categoryInput = CategoryTextBox.Text?.Trim();
-            var groupInput = GroupTextBox.Text?.Trim();
-            var productInput = ProductTextBox.Text?.Trim();
-
-            bool anyInput = !(string.IsNullOrWhiteSpace(vendorInput) &&
-                              string.IsNullOrWhiteSpace(categoryInput) &&
-                              string.IsNullOrWhiteSpace(groupInput) &&
-                              string.IsNullOrWhiteSpace(productInput));
-
-            if (!anyInput)
-            {
-                ClearHighlights();
-
-                RevenueOverlayCanvas.Children.Clear();
-                RevenueOverlayCanvas.IsHitTestVisible = false;
-                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
-
-                return;
-            }
-
-            if (filteredProducts == null || filteredProducts.Count == 0)
-            {
-                DimAllSections_NoResults();
-
-                RevenueOverlayCanvas.Children.Clear();
-                RevenueOverlayCanvas.IsHitTestVisible = false;
-                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
-
-                return;
-            }
-
-            var itemNumbers = filteredProducts
-                .Select(p => p?.ItemNumber)
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (itemNumbers.Count == 0)
-            {
-                DimAllSections_NoResults();
-
-                RevenueOverlayCanvas.Children.Clear();
-                RevenueOverlayCanvas.IsHitTestVisible = false;
-                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
-
-                return;
-            }
-
-            var matchingSectionIds = await ProductPlacementServices.GetSectionIdsForItemNumbersAsync(itemNumbers);
-
-            Debug.WriteLine($"[LiveSalesFloor] Found {matchingSectionIds?.Count ?? 0} matching sections");
-
-            if (matchingSectionIds == null || matchingSectionIds.Count == 0)
-            {
-                DimAllSections_NoResults();
-
-                RevenueOverlayCanvas.Children.Clear();
-                RevenueOverlayCanvas.IsHitTestVisible = false;
-                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
-
-                return;
-            }
-
-            HighlightSections(matchingSectionIds);
-
-            // Prepare overlay for clickable labels
-            RevenueOverlayCanvas.Children.Clear();
-            RevenueOverlayCanvas.Visibility = Visibility.Visible;
-            RevenueOverlayCanvas.IsHitTestVisible = true;
-
-            foreach (var sectionId in matchingSectionIds)
-            {
-                if (string.IsNullOrWhiteSpace(sectionId))
-                    continue;
-
-                try
-                {
-                    DateTime startDate = DateTime.Now.AddMonths(-1);
-                    DateTime endDate = DateTime.Now;
-
-                    decimal revenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, startDate, endDate);
-
-                    // Create the clickable revenue label
-                    var border = new Border
-                    {
-                        Background = new SolidColorBrush(Color.FromArgb(220, 45, 45, 48)),
-                        CornerRadius = new CornerRadius(5),
-                        BorderBrush = Brushes.White,
-                        BorderThickness = new Thickness(1),
-                        Padding = new Thickness(6),
-                        Tag = sectionId,
-                        Cursor = Cursors.Hand,
-                        IsHitTestVisible = true,
-                        Child = new TextBlock
-                        {
-                            Text = $"Revenue: {revenue:C0}",
-                            Foreground = Brushes.White,
-                            FontSize = 12,
-                            FontWeight = FontWeights.SemiBold
-                        }
-                    };
-
-                    border.MouseLeftButtonUp += RevenueLabel_Click;
-
-                    // Find the UI element for the section so we can position the label near it
-                    var sectionElement = LiveFloorCanvas.Children
-                        .OfType<FrameworkElement>()
-                        .FirstOrDefault(el => el.Tag != null &&
-                                              string.Equals(el.Tag.ToString(), sectionId, StringComparison.OrdinalIgnoreCase));
-
-                    if (sectionElement == null)
-                        continue;
-
-                    // Convert coordinates from live canvas to overlay canvas
-                    Point relativeToLive = sectionElement.TranslatePoint(new Point(0, 0), LiveFloorCanvas);
-                    Point relativeToOverlay = LiveFloorCanvas.TranslatePoint(relativeToLive, RevenueOverlayCanvas);
-
-                    double labelX = relativeToOverlay.X + (sectionElement.RenderSize.Width / 2) - 40;
-                    double labelY = relativeToOverlay.Y - 30;
-
-                    Canvas.SetLeft(border, labelX);
-                    Canvas.SetTop(border, labelY);
-
-                    RevenueOverlayCanvas.Children.Add(border);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[LiveSalesFloor] Overlay for section {sectionId}: {ex}");
-                }
-            }
+            if (!string.IsNullOrEmpty(_currentSectionId))
+                _ = ShowFullAnalyticsAsync(_currentSectionId);
         }
 
-
-
-        // LiveSalesFloor.xaml.cs
-        private async void RevenueLabel_Click(object sender, MouseButtonEventArgs e)
+        private async Task ShowFullAnalyticsAsync(string sectionId)
         {
-            e.Handled = true;
-
-            if (sender is not Border border || border.Tag is not string sectionId || string.IsNullOrWhiteSpace(sectionId))
-                return;
-
             try
             {
-                // ✅ IMPORTANT: Once we open SectionDetail, the revenue overlay must NOT block clicks
-                RevenueOverlayCanvas.IsHitTestVisible = false;
-                RevenueOverlayCanvas.Visibility = Visibility.Collapsed;
+                CloseSectionDrawer();
 
-                // --- Load section + date range ---
-                DateTime startDate = DateTime.Now.AddMonths(-1);
-                DateTime endDate = DateTime.Now;
+                var sections    = await CanvasService.LoadSectionsAsync();
+                var section     = sections.FirstOrDefault(s => s.sectionId == sectionId);
+                string name     = string.IsNullOrWhiteSpace(section.name) ? sectionId : section.name;
 
-                // --- Get section name (safe) ---
-                var sections = await CanvasService.LoadSectionsAsync();
-                var section = sections.FirstOrDefault(s => s.sectionId == sectionId);
+                decimal revenue          = await SalesDataServices.GetRevenueBySectionAsync(sectionId, _periodStart, _periodEnd);
+                var activeProducts       = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
+                var archivedProducts     = await ProductPlacementServices.GetArchivedProductsBySectionAsync(sectionId);
 
-                string sectionName =
-                    (section == default) ? sectionId :
-                    (string.IsNullOrWhiteSpace(section.name) ? sectionId : section.name);
-
-                // --- Revenue + product breakdown ---
-                decimal totalRevenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, startDate, endDate);
-
-                var activeProducts = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
-                var archivedProducts = await ProductPlacementServices.GetArchivedProductsBySectionAsync(sectionId);
-
-                var productBreakdown = activeProducts
+                var breakdown = activeProducts
                     .Select(p => new ProductBreakdownItem
                     {
-                        ItemNumber = p.ItemNumber,
-                        ProductName = p.ItemNumber,
-                        QuantitySold = p.QuantitySold,
-                        Revenue = p.Revenue,
-                        IsActive = true,
-                        DatePlaced = p.DatePlaced
+                        ItemNumber   = p.ItemNumber,   ProductName  = p.ItemNumber,
+                        QuantitySold = p.QuantitySold, Revenue      = p.Revenue,
+                        IsActive     = true,           DatePlaced   = p.DatePlaced
                     })
                     .Concat(archivedProducts.Select(a => new ProductBreakdownItem
                     {
-                        ItemNumber = a.ItemNumber,
-                        ProductName = a.ItemNumber,
-                        QuantitySold = 0,
-                        Revenue = a.Revenue,
-                        IsActive = false,
-                        DatePlaced = a.DatePlaced
+                        ItemNumber   = a.ItemNumber,  ProductName  = a.ItemNumber,
+                        QuantitySold = 0,              Revenue     = a.Revenue,
+                        IsActive     = false,          DatePlaced  = a.DatePlaced
                     }))
                     .ToList();
 
-                int totalQty = productBreakdown.Sum(p => p.QuantitySold);
-                var topProduct = productBreakdown.OrderByDescending(p => p.Revenue).FirstOrDefault();
+                var top = breakdown.OrderByDescending(p => p.Revenue).FirstOrDefault();
 
-                // --- Build VM ---
                 var vm = new SectionDetailViewModel
                 {
-                    SectionId = sectionId,
-                    SectionName = sectionName,
-                    StartDate = startDate,
-                    EndDate = endDate,
-                    TotalRevenue = totalRevenue,
-                    TotalQuantitySold = totalQty,
-                    TopProductName = topProduct?.ProductName ?? "N/A",
-                    TopProductRevenue = topProduct?.Revenue ?? 0,
-                    ProductBreakdown = productBreakdown
+                    SectionId          = sectionId,
+                    SectionName        = name,
+                    StartDate          = _periodStart,
+                    EndDate            = _periodEnd,
+                    TotalRevenue       = revenue,
+                    TotalQuantitySold  = breakdown.Sum(p => p.QuantitySold),
+                    TopProductName     = top?.ProductName    ?? "N/A",
+                    TopProductRevenue  = top?.Revenue        ?? 0,
+                    ProductBreakdown   = breakdown
                 };
 
-                // Optional chart loads
-                vm.DailyTrendline = await ChartDataFactory.CreateDailyTrendlineAsync(sectionId, startDate, endDate);
-                vm.TopProductsBarChart = await ChartDataFactory.CreateTopProductsBarAsync(sectionId, startDate, endDate);
-                vm.SectionVsStoreComparison = await ChartDataFactory.CreateSectionVsStoreComparisonAsync(sectionId, startDate, endDate);
+                vm.DailyTrendline           = await ChartDataFactory.CreateDailyTrendlineAsync(sectionId, _periodStart, _periodEnd);
+                vm.TopProductsBarChart      = await ChartDataFactory.CreateTopProductsBarAsync(sectionId, _periodStart, _periodEnd);
+                vm.SectionVsStoreComparison = await ChartDataFactory.CreateSectionVsStoreComparisonAsync(sectionId, _periodStart, _periodEnd);
 
-                // --- Show overlay ---
                 SectionDetailOverlay.Children.Clear();
                 SectionDetailOverlay.Children.Add(new SectionDetail(vm));
-
-                // ✅ Make sure it’s above anything else
                 Panel.SetZIndex(SectionDetailOverlay, 9999);
-
                 SectionDetailOverlay.IsHitTestVisible = true;
-                SectionDetailOverlay.Visibility = Visibility.Visible;
+                SectionDetailOverlay.Visibility       = Visibility.Visible;
             }
             catch (Exception ex)
             {
@@ -823,8 +615,17 @@ namespace Winton.Views
             }
         }
 
-
-
-
+        // ─── Debounce helper ──────────────────────────────────────────────────
+        private void Debounce(ref DispatcherTimer timer, Action action, int ms = 250)
+        {
+            if (timer == null)
+            {
+                var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+                t.Tick += (s, e) => { t.Stop(); action(); };
+                timer = t;
+            }
+            timer.Stop();
+            timer.Start();
+        }
     }
 }

@@ -355,6 +355,53 @@ namespace Winton.Services
 
             return results;
         }
+        /// <summary>
+        /// Retrieves units sold grouped by SectionID between two dates.
+        /// Joins SalesData → ProductPlacements because SalesData has no SectionID.
+        /// </summary>
+        public static async Task<Dictionary<string, int>> GetQuantityBySectionAsync(DateTime startDate, DateTime endDate)
+        {
+            var results = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            using (var connection = new SqliteConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
+
+                string query = @"
+            SELECT
+                pp.SectionID,
+                IFNULL(SUM(sd.QuantitySold), 0) AS TotalQty
+            FROM SalesData sd
+            INNER JOIN ProductPlacements pp
+                ON sd.ItemNumber = pp.ItemNumber
+            WHERE sd.SaleDate BETWEEN @StartDate AND @EndDate
+              AND pp.DateRemoved IS NULL
+            GROUP BY pp.SectionID;
+        ";
+
+                using (var command = new SqliteCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@StartDate", startDate);
+                    command.Parameters.AddWithValue("@EndDate", endDate);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string sectionId = reader["SectionID"]?.ToString();
+                            int qty = reader["TotalQty"] != DBNull.Value
+                                ? Convert.ToInt32(reader["TotalQty"])
+                                : 0;
+
+                            if (!string.IsNullOrWhiteSpace(sectionId))
+                                results[sectionId] = qty;
+                        }
+                    }
+                }
+            }
+
+            return results;
+        }
 
 
 
