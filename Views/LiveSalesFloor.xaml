@@ -161,7 +161,7 @@
         <!-- ═══════════════════════════════════════════════════════════
              ROW 2 — FLOOR CANVAS + RIGHT DRAWER
         ═══════════════════════════════════════════════════════════ -->
-        <Grid Grid.Row="2" ClipToBounds="False">
+        <Grid Grid.Row="2" ClipToBounds="True">
 
             <!-- Floor canvas -->
             <Viewbox Stretch="Uniform">
