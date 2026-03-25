@@ -415,6 +415,41 @@ namespace Winton.Views
 
         private void CloseDrawer_Click(object sender, RoutedEventArgs e) => CloseSectionDrawer();
 
+        // ─── Section rename ───────────────────────────────────────────────────
+        private void DrawerRename_Click(object sender, RoutedEventArgs e)
+        {
+            DrawerSectionNameBox.Text = DrawerSectionName.Text;
+            DrawerNameDisplay.Visibility = Visibility.Collapsed;
+            DrawerNameEdit.Visibility    = Visibility.Visible;
+            DrawerSectionNameBox.Focus();
+            DrawerSectionNameBox.SelectAll();
+        }
+
+        private void DrawerRenameConfirm_Click(object sender, RoutedEventArgs e)
+            => _ = CommitSectionRenameAsync();
+
+        private void DrawerSectionNameBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)  _ = CommitSectionRenameAsync();
+            if (e.Key == Key.Escape) CancelRename();
+        }
+
+        private async Task CommitSectionRenameAsync()
+        {
+            string newName = DrawerSectionNameBox.Text.Trim();
+            if (string.IsNullOrEmpty(newName)) { CancelRename(); return; }
+
+            await CanvasService.UpdateSectionNameAsync(_currentSectionId, newName);
+            DrawerSectionName.Text = newName;
+            CancelRename();
+        }
+
+        private void CancelRename()
+        {
+            DrawerNameEdit.Visibility    = Visibility.Collapsed;
+            DrawerNameDisplay.Visibility = Visibility.Visible;
+        }
+
         // ─── Drawer product search ─────────────────────────────────────────────
         private void DrawerFilter_Changed(object sender, TextChangedEventArgs e)
             => Debounce(ref _drawerFilterDebounce, FilterDrawerProducts);

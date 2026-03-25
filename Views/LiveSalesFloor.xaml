@@ -240,12 +240,46 @@
                             <StackPanel>
                                 <TextBlock Text="SECTION" FontSize="10" FontWeight="SemiBold"
                                            Foreground="{DynamicResource SecondaryText}" Margin="0,0,0,2"/>
-                                <TextBlock x:Name="DrawerSectionName" Text="—"
-                                           FontSize="18" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource PrimaryText}"
-                                           TextTrimming="CharacterEllipsis"/>
+
+                                <!-- Display row: name + edit button -->
+                                <DockPanel x:Name="DrawerNameDisplay" LastChildFill="True">
+                                    <Button x:Name="DrawerRenameBtn"
+                                            DockPanel.Dock="Right"
+                                            Content="✎"
+                                            Background="Transparent" BorderThickness="0"
+                                            Foreground="{DynamicResource SecondaryText}"
+                                            FontSize="13" Cursor="Hand" Padding="6,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Click="DrawerRename_Click"
+                                            ToolTip="Rename section"/>
+                                    <TextBlock x:Name="DrawerSectionName" Text="—"
+                                               FontSize="18" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource PrimaryText}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <!-- Inline edit row (hidden until rename clicked) -->
+                                <DockPanel x:Name="DrawerNameEdit" Visibility="Collapsed">
+                                    <Button DockPanel.Dock="Right"
+                                            Content="✓"
+                                            Background="Transparent" BorderThickness="0"
+                                            Foreground="{DynamicResource Accent}"
+                                            FontSize="14" Cursor="Hand" Padding="6,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Click="DrawerRenameConfirm_Click"
+                                            ToolTip="Save"/>
+                                    <TextBox x:Name="DrawerSectionNameBox"
+                                             FontSize="18" FontWeight="SemiBold"
+                                             Foreground="{DynamicResource PrimaryText}"
+                                             Background="Transparent"
+                                             BorderBrush="{DynamicResource Accent}"
+                                             BorderThickness="0,0,0,1"
+                                             Padding="0,2"
+                                             KeyDown="DrawerSectionNameBox_KeyDown"/>
+                                </DockPanel>
                             </StackPanel>
-                            <Button HorizontalAlignment="Right" VerticalAlignment="Center"
+                            <Button HorizontalAlignment="Right" VerticalAlignment="Top"
                                     Content="✕"
                                     Background="Transparent" BorderThickness="0"
                                     Foreground="{DynamicResource SecondaryText}"

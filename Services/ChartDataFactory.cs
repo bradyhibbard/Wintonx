@@ -19,27 +19,15 @@ namespace Winton.Helpers
             DateTime start,
             DateTime end)
         {
+            var dailyMap = await SalesDataServices.GetDailyRevenueBySectionAsync(sectionId, start, end);
+
             var values = new ChartValues<decimal>();
-            var labels = new List<string>();
-
-            // Pull raw revenue from your SalesData table
-            var allRevenue = await SalesDataServices.GetRevenueDataAsync(start, end);
-
-            // Filter to this section
-            decimal sectionRevenue = allRevenue.ContainsKey(sectionId)
-                ? allRevenue[sectionId]
-                : 0;
-
-            // Build daily series (placeholder: real implementation needs daily breakdown)
-            // For now we assume revenue evenly distributed OR stored by date.
             int totalDays = (end - start).Days + 1;
-            decimal perDay = totalDays > 0 ? sectionRevenue / totalDays : 0;
 
             for (int i = 0; i < totalDays; i++)
             {
-                DateTime day = start.AddDays(i);
-                labels.Add(day.ToString("MM/dd"));
-                values.Add(perDay);
+                DateTime day = start.AddDays(i).Date;
+                values.Add(dailyMap.TryGetValue(day, out decimal rev) ? rev : 0m);
             }
 
             return new SeriesCollection
@@ -62,34 +50,21 @@ namespace Winton.Helpers
             DateTime start,
             DateTime end)
         {
-            var placements = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
+            var itemRevenue = await SalesDataServices.GetRevenueByItemForSectionAsync(sectionId, start, end);
 
-            // Only current placements
-            var active = placements
-                .Where(p => p.DatePlaced <= end)
-                .ToList();
-
-            // Group by ItemNumber
-            var grouped = active
-                .GroupBy(p => p.ItemNumber)
-                .Select(g => new
-                {
-                    Item = g.Key,
-                    Revenue = g.Sum(x => x.Revenue)
-                })
-                .OrderByDescending(x => x.Revenue)
+            var top5 = itemRevenue
+                .OrderByDescending(kv => kv.Value)
                 .Take(5)
                 .ToList();
 
-            var barValues = new ChartValues<decimal>(grouped.Select(g => g.Revenue));
-
-            var series = new ColumnSeries
+            return new SeriesCollection
             {
-                Title = "Revenue",
-                Values = barValues
+                new ColumnSeries
+                {
+                    Title  = "Revenue",
+                    Values = new ChartValues<decimal>(top5.Select(kv => kv.Value))
+                }
             };
-
-            return new SeriesCollection { series };
         }
 
 

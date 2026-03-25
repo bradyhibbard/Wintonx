@@ -1,7 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
-using System.Collections.Concurrent;
 using System.Windows;
 using Winton.Models;
+
 
 
 namespace Winton.Services
@@ -71,8 +71,6 @@ namespace Winton.Services
         /// </summary>
         public static async Task SaveSectionAsync(string sectionId, string name, double x, double y, double width, double height, double rotation, string shapeType)
         {
-            MessageBox.Show($"SaveSectionAsync called for SectionID: {sectionId}", "Debug Info");
-
             using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
             {
                 await connection.OpenAsync();
@@ -80,11 +78,11 @@ namespace Winton.Services
                 string insertQuery = @"
             INSERT INTO Sections (SectionID, Name, XPosition, YPosition, Width, Height, Rotation, ShapeType)
             VALUES (@SectionID, @Name, @X, @Y, @Width, @Height, @Rotation, @ShapeType)
-            ON CONFLICT(SectionID) DO UPDATE SET 
-                Name = excluded.Name, 
-                XPosition = excluded.XPosition, 
-                YPosition = excluded.YPosition, 
-                Width = excluded.Width, 
+            ON CONFLICT(SectionID) DO UPDATE SET
+                Name = excluded.Name,
+                XPosition = excluded.XPosition,
+                YPosition = excluded.YPosition,
+                Width = excluded.Width,
                 Height = excluded.Height,
                 Rotation = excluded.Rotation,
                 ShapeType = excluded.ShapeType";
@@ -99,8 +97,6 @@ namespace Winton.Services
                     command.Parameters.AddWithValue("@Height", height);
                     command.Parameters.AddWithValue("@Rotation", rotation);
                     command.Parameters.AddWithValue("@ShapeType", shapeType);
-
-                    MessageBox.Show($"Saving Section: ID={sectionId}, Name={name}, X={x}, Y={y}, Width={width}, Height={height}", "Debug Info");
                     await command.ExecuteNonQueryAsync();
                 }
             }
