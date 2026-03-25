@@ -47,6 +47,12 @@
                             Style="{StaticResource TitleBarButtonStyle}"
                             Click="Minimize_Click"/>
 
+                    <Button x:Name="MaximizeButton"
+                            Content="□"
+                            Width="46" Height="30"
+                            Style="{StaticResource TitleBarButtonStyle}"
+                            Click="Maximize_Click"/>
+
                     <Button Content="✕"
                             Width="46" Height="30"
                             Style="{StaticResource TitleBarButtonStyle}"
