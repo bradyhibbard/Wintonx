@@ -343,6 +343,12 @@ namespace Winton.Views
 
         private void CloseWindow_Click(object sender, RoutedEventArgs e) => Close();
 
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                DragMove();
+        }
+
         // ----------------------------
         // Helpers
         // ----------------------------
