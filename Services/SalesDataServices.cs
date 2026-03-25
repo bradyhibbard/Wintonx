@@ -403,9 +403,91 @@ namespace Winton.Services
             return results;
         }
 
+        /// <summary>
+        /// Returns daily revenue totals for a single section over the given period.
+        /// </summary>
+        public static async Task<Dictionary<DateTime, decimal>> GetDailyRevenueBySectionAsync(
+            string sectionId, DateTime startDate, DateTime endDate)
+        {
+            var results = new Dictionary<DateTime, decimal>();
 
+            using (var connection = new SqliteConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
 
+                string query = @"
+            SELECT date(sd.SaleDate) AS Day, IFNULL(SUM(sd.Revenue), 0) AS DayRevenue
+            FROM SalesData sd
+            INNER JOIN ProductPlacements pp ON sd.ItemNumber = pp.ItemNumber
+            WHERE sd.SaleDate BETWEEN @StartDate AND @EndDate
+              AND pp.SectionID = @SectionID
+              AND pp.DateRemoved IS NULL
+            GROUP BY date(sd.SaleDate)
+            ORDER BY date(sd.SaleDate);";
 
+                using (var command = new SqliteCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@StartDate", startDate.ToString("yyyy-MM-dd"));
+                    command.Parameters.AddWithValue("@EndDate",   endDate.ToString("yyyy-MM-dd"));
+                    command.Parameters.AddWithValue("@SectionID", sectionId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            if (DateTime.TryParse(reader.GetString(0), out var day))
+                                results[day] = reader.GetDecimal(1);
+                        }
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Returns revenue per item number for a single section over the given period.
+        /// </summary>
+        public static async Task<Dictionary<string, decimal>> GetRevenueByItemForSectionAsync(
+            string sectionId, DateTime startDate, DateTime endDate)
+        {
+            var results = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+            using (var connection = new SqliteConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
+
+                string query = @"
+            SELECT sd.ItemNumber, IFNULL(SUM(sd.Revenue), 0) AS ItemRevenue
+            FROM SalesData sd
+            INNER JOIN ProductPlacements pp ON sd.ItemNumber = pp.ItemNumber
+            WHERE sd.SaleDate BETWEEN @StartDate AND @EndDate
+              AND pp.SectionID = @SectionID
+              AND pp.DateRemoved IS NULL
+            GROUP BY sd.ItemNumber
+            ORDER BY ItemRevenue DESC;";
+
+                using (var command = new SqliteCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@StartDate", startDate.ToString("yyyy-MM-dd"));
+                    command.Parameters.AddWithValue("@EndDate",   endDate.ToString("yyyy-MM-dd"));
+                    command.Parameters.AddWithValue("@SectionID", sectionId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string item = reader.GetString(0);
+                            decimal rev = reader.GetDecimal(1);
+                            if (!string.IsNullOrWhiteSpace(item))
+                                results[item] = rev;
+                        }
+                    }
+                }
+            }
+
+            return results;
+        }
     }
 
 }
