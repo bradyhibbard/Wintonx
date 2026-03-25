@@ -60,6 +60,7 @@ namespace Winton
                 Height = workingArea.Height;
 
                 _isWorkingAreaMaximized = true;
+                MaximizeButton.Content = "❐";
             }
             else
             {
@@ -70,8 +71,11 @@ namespace Winton
                 Height = _restoreBounds.Height;
 
                 _isWorkingAreaMaximized = false;
+                MaximizeButton.Content = "□";
             }
         }
+
+        private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleWindowState();
 
         //adding a comment for testing git
         private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
