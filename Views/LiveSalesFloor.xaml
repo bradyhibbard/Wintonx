@@ -237,7 +237,13 @@
                             BorderBrush="{DynamicResource Divider}" BorderThickness="0,0,0,1"
                             Padding="16,14">
                         <Grid>
-                            <StackPanel>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left: section label + name + rename -->
+                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <TextBlock Text="SECTION" FontSize="10" FontWeight="SemiBold"
                                            Foreground="{DynamicResource SecondaryText}" Margin="0,0,0,2"/>
 
@@ -248,7 +254,7 @@
                                             Content="✎"
                                             Background="Transparent" BorderThickness="0"
                                             Foreground="{DynamicResource SecondaryText}"
-                                            FontSize="13" Cursor="Hand" Padding="6,0,0,0"
+                                            FontSize="13" Cursor="Hand" Padding="8,0,0,0"
                                             VerticalAlignment="Center"
                                             Click="DrawerRename_Click"
                                             ToolTip="Rename section"/>
@@ -265,7 +271,7 @@
                                             Content="✓"
                                             Background="Transparent" BorderThickness="0"
                                             Foreground="{DynamicResource Accent}"
-                                            FontSize="14" Cursor="Hand" Padding="6,0,0,0"
+                                            FontSize="14" Cursor="Hand" Padding="8,0,0,0"
                                             VerticalAlignment="Center"
                                             Click="DrawerRenameConfirm_Click"
                                             ToolTip="Save"/>
@@ -279,8 +285,11 @@
                                              KeyDown="DrawerSectionNameBox_KeyDown"/>
                                 </DockPanel>
                             </StackPanel>
-                            <Button HorizontalAlignment="Right" VerticalAlignment="Top"
+
+                            <!-- Right: close button -->
+                            <Button Grid.Column="1"
                                     Content="✕"
+                                    VerticalAlignment="Top"
                                     Background="Transparent" BorderThickness="0"
                                     Foreground="{DynamicResource SecondaryText}"
                                     FontSize="16" Cursor="Hand"
