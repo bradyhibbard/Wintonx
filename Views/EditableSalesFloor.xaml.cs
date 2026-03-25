@@ -37,16 +37,43 @@ namespace Winton.Views
 
 
         private readonly SectionManager _sectionManager;
-        private Shape _selectedShape;
+        private Shape _selectedShape;                         // primary / last-clicked
+        private readonly List<Shape> _selectedShapes = new(); // full multi-select set
+        private readonly Dictionary<Polyline, Partition> _partitionMap = new();
         private List<string> _deletedPartitionIds = new();
-
 
         // --------------------------------------------------
         // Dragging Fields for Shapes
         // --------------------------------------------------
         private bool _isDragging = false;
         private Point _dragStart;
-        private TranslateTransform _dragTransform;
+        private TranslateTransform _dragTransform; // kept for SectionButton compat
+
+        // --------------------------------------------------
+        // Selection helpers
+        // --------------------------------------------------
+        private void DeselectAll()
+        {
+            foreach (var s in _selectedShapes)
+                RestoreShapeAppearance(s);
+            _selectedShapes.Clear();
+            _selectedShape = null;
+        }
+
+        private void RestoreShapeAppearance(Shape s)
+        {
+            s.Stroke = s.Tag?.ToString() == "Partition" ? Brushes.SteelBlue : Brushes.Black;
+            s.StrokeThickness = 2;
+        }
+
+        private static TranslateTransform EnsureTranslateTransform(UIElement element)
+        {
+            if (element.RenderTransform is TranslateTransform existing)
+                return existing;
+            var tt = new TranslateTransform();
+            element.RenderTransform = tt;
+            return tt;
+        }
 
         // --------------------------------------------------
         // Perimeter Drawing State
@@ -186,25 +213,16 @@ namespace Winton.Views
         // Select an element (shape or button-wrapped shape) from a context-click
         public void SelectElementForContext(FrameworkElement element)
         {
-            // If it’s a Button wrapping a Shape, unwrap it
             if (element is Button btn && btn.Content is Shape wrapped) element = wrapped;
 
             var shape = element as Shape;
             if (shape == null) return;
 
-            // Remove highlight from previous selection
-            if (_selectedShape != null)
-            {
-                _selectedShape.Stroke = Brushes.Black;
-                _selectedShape.StrokeThickness = 2;
-            }
-
-            // Set & highlight new selection
+            DeselectAll();
             _selectedShape = shape;
-            _selectedShape.Stroke = Brushes.DeepSkyBlue;
-            _selectedShape.StrokeThickness = 3;
-
-            // Ensure we’re not starting a drag from a right-click
+            _selectedShapes.Add(shape);
+            shape.Stroke = Brushes.DeepSkyBlue;
+            shape.StrokeThickness = 3;
             _isDragging = false;
         }
 
@@ -617,24 +635,32 @@ namespace Winton.Views
             // ----- DELETE (Delete key) -----
             if (e.Key == Key.Delete)
             {
-                // Partition selected via _selectedShape
-                if (_selectedShape?.Tag?.ToString() == "Partition")
+                // Delete all selected partition shapes (supports multi-select)
+                var selectedPartitions = _selectedShapes
+                    .OfType<Polyline>()
+                    .Where(p => p.Tag?.ToString() == "Partition")
+                    .ToList();
+
+                if (selectedPartitions.Count > 0)
                 {
-                    SalesFloorCanvas.Children.Remove(_selectedShape);
-                    var removedPartition = RemovePartitionAssociatedWithShape(_selectedShape);
-                    if (removedPartition != null)
+                    foreach (var partitionPolyline in selectedPartitions)
                     {
-                        _partitions.Remove(removedPartition);
-                        if (!string.IsNullOrEmpty(removedPartition.Id))
+                        SalesFloorCanvas.Children.Remove(partitionPolyline);
+                        if (_partitionMap.TryGetValue(partitionPolyline, out var partition))
                         {
-                            if (!_deletedPartitionIds.Contains(removedPartition.Id))
-                                _deletedPartitionIds.Add(removedPartition.Id);
-                            await CanvasService.DeletePartitionAsync(removedPartition.Id);
-                            ShowAutoSaved();
-                            Debug.WriteLine($"[EditableSalesFloor] Partition {removedPartition.Id} deleted via Delete key.");
+                            _partitions.Remove(partition);
+                            _partitionMap.Remove(partitionPolyline);
+                            if (!string.IsNullOrEmpty(partition.Id))
+                            {
+                                if (!_deletedPartitionIds.Contains(partition.Id))
+                                    _deletedPartitionIds.Add(partition.Id);
+                                await CanvasService.DeletePartitionAsync(partition.Id);
+                                Debug.WriteLine($"[EditableSalesFloor] Partition {partition.Id} deleted via Delete key.");
+                            }
                         }
                     }
-                    _selectedShape = null;
+                    DeselectAll();
+                    ShowAutoSaved();
                     e.Handled = true;
                     return;
                 }
@@ -686,6 +712,7 @@ namespace Winton.Views
             var clickedElement = e.OriginalSource as FrameworkElement;
             if (clickedElement == SalesFloorCanvas)
             {
+                DeselectAll();
                 _sectionManager.ClearSelection();
             }
 
@@ -706,80 +733,102 @@ namespace Winton.Views
         }
 
 
-        // NEW or Modified: Shape event handlers to support double-click editing and dragging.
+        // Shape event handlers supporting selection, multi-select (Ctrl+Click), and drag.
         public void Shape_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (!_isEditMode) return;
+
+            // Don't intercept during active drawing — let clicks pass through to the canvas
+            if (_isDrawingPartition || _isDrawingPerimeter) return;
 
             Shape shape = null;
             Button button = null;
 
             if (sender is Button btn && btn.Content is Shape wrappedShape)
             {
-                button = btn;          // Keep the Button for editing
-                shape = wrappedShape;  // Still track the shape for highlighting
+                button = btn;
+                shape = wrappedShape;
             }
             else if (sender is Shape s)
             {
                 shape = s;
-
-                // Check if this Shape is inside a Button (its Parent might be a Button)
                 if (s.Parent is Button parentBtn)
-                {
                     button = parentBtn;
-                }
             }
 
             if (shape == null) return;
 
-            // Handle double-click
+            // Double-click opens the section editor
             if (e.ClickCount == 2)
             {
                 if (shape.Tag?.ToString() == "SectionButton")
                 {
-                    // Always pass the Button (or fallback to the shape if no button exists)
                     var shapeElement = (button != null) ? (FrameworkElement)button : shape;
-
-                    var editWindow = new AddSectionsWindow(shapeElement)
-                    {
-                        Owner = Window.GetWindow(this)
-                    };
+                    var editWindow = new AddSectionsWindow(shapeElement) { Owner = Window.GetWindow(this) };
                     editWindow.Show();
                 }
                 return;
             }
 
-            // Deselect the previous shape (remove highlight)
-            if (_selectedShape != null)
+            bool isCtrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+            bool isPartition = shape.Tag?.ToString() == "Partition";
+
+            if (isCtrl)
             {
-                // Restore the original color depending on shape type
-                _selectedShape.Stroke = _selectedShape.Tag?.ToString() == "Partition"
-                    ? Brushes.SteelBlue
-                    : Brushes.Black;
-                _selectedShape.StrokeThickness = 2;
+                // Ctrl+Click: toggle this shape in/out of the selection
+                if (_selectedShapes.Contains(shape))
+                {
+                    _selectedShapes.Remove(shape);
+                    RestoreShapeAppearance(shape);
+                    _selectedShape = _selectedShapes.LastOrDefault();
+                }
+                else
+                {
+                    _selectedShapes.Add(shape);
+                    shape.Stroke = Brushes.DeepSkyBlue;
+                    shape.StrokeThickness = 3;
+                    _selectedShape = shape;
+                }
+            }
+            else
+            {
+                if (!_selectedShapes.Contains(shape))
+                {
+                    // New single selection — clear previous
+                    DeselectAll();
+                    _selectedShapes.Add(shape);
+                    shape.Stroke = Brushes.DeepSkyBlue;
+                    shape.StrokeThickness = 3;
+                    _selectedShape = shape;
+                }
+                else
+                {
+                    // Clicking an already-selected shape starts a group drag
+                    _selectedShape = shape;
+                }
             }
 
-            // Set the new selected shape
-            _selectedShape = shape;
+            // Prevent the canvas from treating this as a drawing click
+            e.Handled = true;
 
-            // Highlight the new selected shape
-            _selectedShape.Stroke = Brushes.DeepSkyBlue;
-            _selectedShape.StrokeThickness = 3;
+            // Start drag
+            bool hasPartitionSelected = _selectedShapes.Any(s => s.Tag?.ToString() == "Partition");
+            bool onlySection = _selectedShapes.Count == 1 && shape.Tag?.ToString() == "SectionButton";
 
-            // Enable dragging only for Section Buttons
-            if (_selectedShape.Tag?.ToString() == "SectionButton")
+            if (hasPartitionSelected)
             {
                 _dragStart = e.GetPosition(SalesFloorCanvas);
-
-                _dragTransform = _selectedShape.RenderTransform as TranslateTransform;
-                if (_dragTransform == null)
-                {
-                    _dragTransform = new TranslateTransform();
-                    _selectedShape.RenderTransform = _dragTransform;
-                }
-
                 _isDragging = true;
-                _selectedShape.CaptureMouse();
+                foreach (var sel in _selectedShapes.Where(s => s.Tag?.ToString() == "Partition"))
+                    EnsureTranslateTransform(sel);
+                shape.CaptureMouse();
+            }
+            else if (onlySection)
+            {
+                _dragStart = e.GetPosition(SalesFloorCanvas);
+                _dragTransform = EnsureTranslateTransform(shape);
+                _isDragging = true;
+                shape.CaptureMouse();
             }
             else
             {
@@ -793,24 +842,78 @@ namespace Winton.Views
 
         public void Shape_MouseMove(object sender, MouseEventArgs e)
         {
-            if (_isDragging && _selectedShape != null)
+            if (!_isDragging || _selectedShapes.Count == 0) return;
+
+            Point currentPos = e.GetPosition(SalesFloorCanvas);
+            double offsetX = currentPos.X - _dragStart.X;
+            double offsetY = currentPos.Y - _dragStart.Y;
+            _dragStart = currentPos;
+
+            bool hasPartitions = _selectedShapes.Any(s => s.Tag?.ToString() == "Partition");
+
+            if (hasPartitions)
             {
-                Point currentPos = e.GetPosition(SalesFloorCanvas);
-                double offsetX = currentPos.X - _dragStart.X;
-                double offsetY = currentPos.Y - _dragStart.Y;
+                // Move all selected partition polylines together
+                foreach (var sel in _selectedShapes.Where(s => s.Tag?.ToString() == "Partition"))
+                {
+                    var tt = EnsureTranslateTransform(sel);
+                    tt.X += offsetX;
+                    tt.Y += offsetY;
+                }
+            }
+            else if (_dragTransform != null)
+            {
+                // Legacy single-section drag
                 _dragTransform.X += offsetX;
                 _dragTransform.Y += offsetY;
-                _dragStart = currentPos;
             }
         }
 
-        public void Shape_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        public async void Shape_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (_isDragging)
+            if (!_isDragging) return;
+
+            _isDragging = false;
+
+            // Commit TranslateTransform offsets back into the actual Polyline.Points
+            var movedPartitions = _selectedShapes
+                .OfType<Polyline>()
+                .Where(p => p.Tag?.ToString() == "Partition")
+                .ToList();
+
+            if (movedPartitions.Count > 0)
             {
-                _isDragging = false;
-                _selectedShape?.ReleaseMouseCapture();
-                e.Handled = true;
+                foreach (var pl in movedPartitions)
+                    CommitPartitionTransform(pl);
+
+                await CanvasService.SavePartitionsAsync(_partitions, new List<string>());
+                ShowAutoSaved();
+            }
+
+            _selectedShape?.ReleaseMouseCapture();
+            e.Handled = true;
+        }
+
+        // Bake a Polyline's current TranslateTransform into its actual Points,
+        // then zero the transform so rendering stays consistent.
+        private void CommitPartitionTransform(Polyline polyline)
+        {
+            if (polyline.RenderTransform is not TranslateTransform tt) return;
+            if (tt.X == 0 && tt.Y == 0) return;
+
+            var offset = new Vector(tt.X, tt.Y);
+            var newPoints = polyline.Points.Select(p => p + offset).ToList();
+            polyline.Points.Clear();
+            foreach (var p in newPoints)
+                polyline.Points.Add(p);
+
+            tt.X = 0;
+            tt.Y = 0;
+
+            if (_partitionMap.TryGetValue(polyline, out var partition))
+            {
+                partition.Points.Clear();
+                partition.Points.AddRange(newPoints);
             }
         }
 
@@ -952,6 +1055,7 @@ namespace Winton.Views
                 var partition = new Partition();
                 partition.Points.AddRange(_partitionPoints);
                 _partitions.Add(partition);
+                _partitionMap[_partitionLine] = partition;
             }
 
             // Remove drawing dots — they only show during active drawing
@@ -964,6 +1068,8 @@ namespace Winton.Views
 
             _partitionLine.Tag = "Partition";
             _partitionLine.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
+            _partitionLine.MouseMove += Shape_MouseMove;
+            _partitionLine.MouseLeftButtonUp += Shape_MouseLeftButtonUp;
 
             _partitionPoints.Clear();
             _partitionDots.Clear();
@@ -1037,13 +1143,11 @@ namespace Winton.Views
 
             if (partitionLine != null)
             {
-                var partitionToRemove = _partitions.FirstOrDefault(p =>
-                    p.Points.Count == partitionLine.Points.Count &&
-                    p.Points.Zip(partitionLine.Points, (p1, p2) => (p1 - p2).Length < 1.0).All(x => x));
-
-                if (partitionToRemove != null)
+                // Use _partitionMap for O(1) lookup instead of fragile point matching
+                if (_partitionMap.TryGetValue(partitionLine, out var partitionToRemove))
                 {
                     _partitions.Remove(partitionToRemove);
+                    _partitionMap.Remove(partitionLine);
 
                     if (!string.IsNullOrEmpty(partitionToRemove.Id))
                     {
@@ -1168,10 +1272,12 @@ namespace Winton.Views
                 // 🆕 Tag and wire up click to make loaded partitions selectable:
                 partitionLine.Tag = "Partition";
                 partitionLine.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
-
+                partitionLine.MouseMove += Shape_MouseMove;
+                partitionLine.MouseLeftButtonUp += Shape_MouseLeftButtonUp;
 
                 SalesFloorCanvas.Children.Add(partitionLine);
                 _partitions.Add(partition);
+                _partitionMap[partitionLine] = partition;
             }
         }
 
