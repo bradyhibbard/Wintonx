@@ -86,10 +86,7 @@ namespace Winton.Views
                     .FirstOrDefault(b => b.Tag as string == section.sectionId);
 
                 if (button != null)
-                {
                     button.Focusable = false;
-                    button.Click += Section_Click;
-                }
             }
         }
 
@@ -235,6 +232,7 @@ namespace Winton.Views
         {
             if (!_initialized) return;
             _heatByRevenue = RevenueModeBtn.IsChecked == true;
+            LegendLabel.Text = _heatByRevenue ? "REVENUE" : "UNITS SOLD";
             _ = ApplyHeatMapAsync();
         }
 
@@ -348,13 +346,6 @@ namespace Winton.Views
             });
         }
 
-        // ─── Section click → drawer ───────────────────────────────────────────
-        private void Section_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string sectionId)
-                _ = OpenSectionDrawerAsync(sectionId);
-        }
-
         // ─── Section drawer ───────────────────────────────────────────────────
         private async Task OpenSectionDrawerAsync(string sectionId)
         {
@@ -377,8 +368,10 @@ namespace Winton.Views
             decimal revenue  = await SalesDataServices.GetRevenueBySectionAsync(sectionId, _periodStart, _periodEnd);
             DrawerRevenue.Text = revenue.ToString("C0");
 
+            var qtyMap = await SalesDataServices.GetQuantityBySectionAsync(_periodStart, _periodEnd);
+            DrawerQty.Text = qtyMap.GetValueOrDefault(sectionId, 0).ToString("N0");
+
             var products = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
-            DrawerQty.Text          = products.Sum(p => p.QuantitySold).ToString("N0");
             DrawerProductCount.Text = products.Count.ToString();
 
             // Products currently in this section
