@@ -76,35 +76,41 @@
                     <StackPanel x:Name="Sidebar">
 
                         <!-- NAV BUTTONS -->
-                        <Button Style="{StaticResource NavButton}"
+                        <Button x:Name="DashboardButton"
+                                Style="{StaticResource NavButton}"
                                 Content="Dashboard"
                                 Click="Dashboard_Click"
-                                Margin="0 4"/>
+                                Margin="0 2"/>
 
-                        <Button Style="{StaticResource NavButton}"
+                        <Button x:Name="SalesFloorButton"
+                                Style="{StaticResource NavButton}"
                                 Content="Sales Floor"
                                 Click="SalesFloor_Click"
-                                Margin="0 4"/>
+                                Margin="0 2"/>
 
-                        <Button Style="{StaticResource NavButton}"
+                        <Button x:Name="ProductListButton"
+                                Style="{StaticResource NavButton}"
                                 Content="Product List"
                                 Click="ProductList_Click"
-                                Margin="0 4"/>
+                                Margin="0 2"/>
 
-                        <Button Style="{StaticResource NavButton}"
+                        <Button x:Name="ReportsButton"
+                                Style="{StaticResource NavButton}"
                                 Content="Reports"
                                 Click="Reports_Click"
-                                Margin="0 4"/>
+                                Margin="0 2"/>
 
-                        <Button Style="{StaticResource NavButton}"
+                        <Button x:Name="CanvasButton"
+                                Style="{StaticResource NavButton}"
                                 Content="Canvas"
                                 Click="Canvas_Click"
-                                Margin="0 4"/>
+                                Margin="0 2"/>
 
-                        <Button Style="{StaticResource NavButton}"
+                        <Button x:Name="SettingsButton"
+                                Style="{StaticResource NavButton}"
                                 Content="Settings"
                                 Click="DB_Click"
-                                Margin="0 4"/>
+                                Margin="0 2"/>
 
                         <!-- Dummy ExpandButton so existing code-behind compiles -->
                         <Button x:Name="ExpandButton"

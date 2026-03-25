@@ -21,6 +21,10 @@
     <SolidColorBrush x:Key="AccentLight" Color="#3399E6"/>
     <SolidColorBrush x:Key="AccentDark" Color="#005A9E"/>
 
+    <!-- Sidebar nav hover / active states -->
+    <SolidColorBrush x:Key="NavHover" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="NavActive" Color="#E0EEFF"/>
+
     <!-- Card Shadow -->
     <DropShadowEffect x:Key="CardShadow"
                       BlurRadius="15"

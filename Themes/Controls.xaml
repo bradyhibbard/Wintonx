@@ -6,15 +6,55 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="Padding" Value="14,9"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <!-- Hover / active background pill -->
+                        <Border x:Name="BgBorder"
+                                Background="Transparent"
+                                CornerRadius="6"
+                                Margin="4,1"/>
 
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="#EDEDED"/>
-            </Trigger>
-        </Style.Triggers>
+                        <!-- Active accent bar on left edge -->
+                        <Rectangle x:Name="AccentBar"
+                                   Width="3"
+                                   HorizontalAlignment="Left"
+                                   RadiusX="1.5" RadiusY="1.5"
+                                   Fill="{DynamicResource Accent}"
+                                   Visibility="Collapsed"/>
+
+                        <!-- Label -->
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True"/>
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+                        <!-- Hover -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="BgBorder" Property="Background" Value="{DynamicResource NavHover}"/>
+                        </Trigger>
+
+                        <!-- Active page (Tag="Active" set from code-behind) -->
+                        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="Active">
+                            <Setter TargetName="BgBorder" Property="Background" Value="{DynamicResource NavActive}"/>
+                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible"/>
+                            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+                        </DataTrigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- DASHBOARD CARD STYLE -->
