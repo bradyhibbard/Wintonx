@@ -35,7 +35,21 @@ namespace Winton
             await DatabaseService.InitializeDatabaseAsync();
             Debug.WriteLine($"Using DB path: {Path.GetFullPath(DatabaseConfig.DbPath)}");
 
-            MainContent.Content = new Dashboard();
+            NavigateToDashboard();
+        }
+
+        private void NavigateToDashboard()
+        {
+            var dashboard = new Dashboard();
+            dashboard.NavigationRequested += dest =>
+            {
+                switch (dest)
+                {
+                    case "Reports":    Reports_Click(ReportsButton, null);   break;
+                    case "SalesFloor": SalesFloor_Click(SalesFloorButton, null); break;
+                }
+            };
+            MainContent.Content = dashboard;
             SetActiveNav(DashboardButton);
         }
 
@@ -120,7 +134,7 @@ namespace Winton
         private void Dashboard_Click(object sender, RoutedEventArgs e)
         {
             SetActiveNav((Button)sender);
-            MainContent.Content = new Dashboard();
+            NavigateToDashboard();
         }
 
         private void SalesFloor_Click(object sender, RoutedEventArgs e)

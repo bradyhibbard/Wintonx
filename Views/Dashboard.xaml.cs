@@ -1,26 +1,35 @@
-﻿using System.Windows;
+using System;
+using System.Windows;
 using System.Windows.Controls;
 using Winton.ViewModels;
 
 namespace Winton.Views
 {
-    /// <summary>
-    /// Interaction logic for Dashboard.xaml
-    /// </summary>
     public partial class Dashboard : UserControl
     {
+        public event Action<string> NavigationRequested;
+
         public Dashboard()
         {
             InitializeComponent();
-
-            this.DataContext = new DashboardViewModel();
+            DataContext = new DashboardViewModel();
         }
 
         private void OpenDetailedChart_Click(object sender, RoutedEventArgs e)
         {
-            var viewModel = (DashboardViewModel)DataContext;
-            var detailedChartWindow = new DetailedChartWindow(viewModel.CurrentYearRevenue, viewModel.PreviousYearRevenue, viewModel.Months, viewModel.Formatter);
-            detailedChartWindow.Show();
+            var vm = (DashboardViewModel)DataContext;
+            var window = new DetailedChartWindow(
+                vm.CurrentYearRevenue,
+                vm.PreviousYearRevenue,
+                vm.Months,
+                vm.Formatter);
+            window.Show();
         }
+
+        private void UploadReport_Click(object sender, RoutedEventArgs e)
+            => NavigationRequested?.Invoke("Reports");
+
+        private void OpenSalesFloor_Click(object sender, RoutedEventArgs e)
+            => NavigationRequested?.Invoke("SalesFloor");
     }
 }
