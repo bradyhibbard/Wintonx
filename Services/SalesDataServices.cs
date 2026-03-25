@@ -488,6 +488,134 @@ namespace Winton.Services
 
             return results;
         }
+
+        public static async Task<decimal> GetTotalRevenueForYearAsync(int year)
+        {
+            decimal total = 0;
+            try
+            {
+                using var connection = new SqliteConnection(ConnectionString);
+                await connection.OpenAsync();
+                using var command = new SqliteCommand(
+                    "SELECT IFNULL(SUM(Revenue),0) FROM SalesData WHERE strftime('%Y',SaleDate)=@Year",
+                    connection);
+                command.Parameters.AddWithValue("@Year", year.ToString());
+                var result = await command.ExecuteScalarAsync();
+                if (result != DBNull.Value && result != null) total = Convert.ToDecimal(result);
+            }
+            catch (Exception ex) { Debug.WriteLine($"[SalesDataServices] GetTotalRevenueForYearAsync: {ex}"); }
+            return total;
+        }
+
+        public static async Task<decimal> GetTotalRevenueForMonthAsync(int year, int month)
+        {
+            decimal total = 0;
+            try
+            {
+                using var connection = new SqliteConnection(ConnectionString);
+                await connection.OpenAsync();
+                using var command = new SqliteCommand(
+                    "SELECT IFNULL(SUM(Revenue),0) FROM SalesData WHERE strftime('%Y',SaleDate)=@Year AND strftime('%m',SaleDate)=@Month",
+                    connection);
+                command.Parameters.AddWithValue("@Year", year.ToString());
+                command.Parameters.AddWithValue("@Month", month.ToString("D2"));
+                var result = await command.ExecuteScalarAsync();
+                if (result != DBNull.Value && result != null) total = Convert.ToDecimal(result);
+            }
+            catch (Exception ex) { Debug.WriteLine($"[SalesDataServices] GetTotalRevenueForMonthAsync: {ex}"); }
+            return total;
+        }
+
+        public static async Task<int> GetTotalUnitsSoldAsync(DateTime start, DateTime end)
+        {
+            int total = 0;
+            try
+            {
+                using var connection = new SqliteConnection(ConnectionString);
+                await connection.OpenAsync();
+                using var command = new SqliteCommand(
+                    "SELECT IFNULL(SUM(QuantitySold),0) FROM SalesData WHERE SaleDate BETWEEN @Start AND @End",
+                    connection);
+                command.Parameters.AddWithValue("@Start", start.ToString("yyyy-MM-dd"));
+                command.Parameters.AddWithValue("@End",   end.ToString("yyyy-MM-dd"));
+                var result = await command.ExecuteScalarAsync();
+                if (result != DBNull.Value && result != null) total = Convert.ToInt32(result);
+            }
+            catch (Exception ex) { Debug.WriteLine($"[SalesDataServices] GetTotalUnitsSoldAsync: {ex}"); }
+            return total;
+        }
+
+        public static async Task<DateTime?> GetLastReportDateAsync()
+        {
+            try
+            {
+                using var connection = new SqliteConnection(ConnectionString);
+                await connection.OpenAsync();
+                using var command = new SqliteCommand("SELECT MAX(SaleDate) FROM SalesData", connection);
+                var result = await command.ExecuteScalarAsync();
+                if (result != DBNull.Value && result != null && DateTime.TryParse(result.ToString(), out var date))
+                    return date;
+            }
+            catch (Exception ex) { Debug.WriteLine($"[SalesDataServices] GetLastReportDateAsync: {ex}"); }
+            return null;
+        }
+
+        public static async Task<List<(string name, decimal revenue)>> GetTopSectionsByRevenueAsync(
+            DateTime start, DateTime end, int count = 5)
+        {
+            var results = new List<(string, decimal)>();
+            try
+            {
+                using var connection = new SqliteConnection(ConnectionString);
+                await connection.OpenAsync();
+                string query = @"
+                    SELECT COALESCE(s.Name, pp.SectionID) AS SectionName,
+                           IFNULL(SUM(sd.Revenue), 0) AS TotalRevenue
+                    FROM SalesData sd
+                    INNER JOIN ProductPlacements pp ON sd.ItemNumber = pp.ItemNumber
+                    LEFT JOIN Sections s ON pp.SectionID = s.SectionID
+                    WHERE sd.SaleDate BETWEEN @Start AND @End
+                      AND pp.DateRemoved IS NULL
+                    GROUP BY pp.SectionID
+                    ORDER BY TotalRevenue DESC
+                    LIMIT @Count;";
+                using var command = new SqliteCommand(query, connection);
+                command.Parameters.AddWithValue("@Start", start.ToString("yyyy-MM-dd"));
+                command.Parameters.AddWithValue("@End",   end.ToString("yyyy-MM-dd"));
+                command.Parameters.AddWithValue("@Count", count);
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    results.Add((reader.GetString(0), reader.GetDecimal(1)));
+            }
+            catch (Exception ex) { Debug.WriteLine($"[SalesDataServices] GetTopSectionsByRevenueAsync: {ex}"); }
+            return results;
+        }
+
+        public static async Task<List<(string category, decimal revenue)>> GetCategoryRevenueAsync(
+            DateTime start, DateTime end)
+        {
+            var results = new List<(string, decimal)>();
+            try
+            {
+                using var connection = new SqliteConnection(ConnectionString);
+                await connection.OpenAsync();
+                string query = @"
+                    SELECT Cat, IFNULL(SUM(Revenue), 0) AS TotalRevenue
+                    FROM SalesData
+                    WHERE SaleDate BETWEEN @Start AND @End
+                      AND Cat IS NOT NULL AND Cat != ''
+                    GROUP BY Cat
+                    ORDER BY TotalRevenue DESC;";
+                using var command = new SqliteCommand(query, connection);
+                command.Parameters.AddWithValue("@Start", start.ToString("yyyy-MM-dd"));
+                command.Parameters.AddWithValue("@End",   end.ToString("yyyy-MM-dd"));
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    results.Add((reader.GetString(0), reader.GetDecimal(1)));
+            }
+            catch (Exception ex) { Debug.WriteLine($"[SalesDataServices] GetCategoryRevenueAsync: {ex}"); }
+            return results;
+        }
     }
 
 }
