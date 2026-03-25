@@ -11,7 +11,6 @@ namespace Winton.Views
         public ProductListViewModel()
         {
             Products = new ObservableCollection<Product>();
-            LoadProducts(); // Load initial products from the database or source
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -19,11 +18,6 @@ namespace Winton.Views
         protected void OnPropertyChanged(string name)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        }
-
-        private async void LoadProducts()
-        {
-
         }
 
     }

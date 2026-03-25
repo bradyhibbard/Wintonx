@@ -1,4 +1,4 @@
-﻿namespace Windton.Models
+﻿namespace Winton.Models
 {
     internal class Archive
     {

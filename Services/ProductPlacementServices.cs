@@ -594,44 +594,48 @@ namespace Winton.Services
         {
             var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            var list = itemNumbers?
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (list == null || list.Count == 0)
-                return ids;
-
-            // Build a parameterized IN clause: @p0, @p1, ...
-            var paramNames = list.Select((_, i) => $"@p{i}").ToList();
-
-            var sql = $@"
-        SELECT DISTINCT SectionID
-        FROM ProductPlacements
-        WHERE DateRemoved IS NULL
-          AND ItemNumber IN ({string.Join(",", paramNames)})
-    ";
-
-            using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
+            try
             {
-                await connection.OpenAsync();
-                using (var cmd = new SqliteCommand(sql, connection))
-                {
-                    for (int i = 0; i < list.Count; i++)
-                    {
-                        cmd.Parameters.AddWithValue(paramNames[i], list[i]);
-                    }
+                var list = itemNumbers?
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
 
-                    using (var reader = await cmd.ExecuteReaderAsync())
+                if (list == null || list.Count == 0)
+                    return ids;
+
+                // Build a parameterized IN clause: @p0, @p1, ...
+                var paramNames = list.Select((_, i) => $"@p{i}").ToList();
+
+                var sql = $@"
+            SELECT DISTINCT SectionID
+            FROM ProductPlacements
+            WHERE DateRemoved IS NULL
+              AND ItemNumber IN ({string.Join(",", paramNames)})";
+
+                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
+                {
+                    await connection.OpenAsync();
+                    using (var cmd = new SqliteCommand(sql, connection))
                     {
-                        while (await reader.ReadAsync())
+                        for (int i = 0; i < list.Count; i++)
+                            cmd.Parameters.AddWithValue(paramNames[i], list[i]);
+
+                        using (var reader = await cmd.ExecuteReaderAsync())
                         {
-                            var sectionId = reader["SectionID"]?.ToString();
-                            if (!string.IsNullOrEmpty(sectionId))
-                                ids.Add(sectionId);
+                            while (await reader.ReadAsync())
+                            {
+                                var sectionId = reader["SectionID"]?.ToString();
+                                if (!string.IsNullOrEmpty(sectionId))
+                                    ids.Add(sectionId);
+                            }
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ProductPlacementServices] GetSectionIdsForItemNumbersAsync: {ex}");
             }
 
             return ids;
