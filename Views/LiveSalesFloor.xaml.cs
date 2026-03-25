@@ -34,6 +34,8 @@ namespace Winton.Views
         private DispatcherTimer _filterDebounce;
         private DispatcherTimer _drawerFilterDebounce;
 
+        private bool _initialized = false;
+
         // ─── Constructor ──────────────────────────────────────────────────────
         public LiveSalesFloor()
         {
@@ -54,6 +56,7 @@ namespace Winton.Views
         // ─── Initialisation ───────────────────────────────────────────────────
         private async Task InitializeAsync()
         {
+            _initialized = true;
             _allProducts = await ProductService.GetProductsAsync();
             await LoadSectionsAsync();
             await LoadPerimeterAsync();
@@ -119,6 +122,7 @@ namespace Winton.Views
             if (DateRangeCombo.SelectedItem is ComboBoxItem item)
                 SetDateRange(item.Content?.ToString());
 
+            if (!_initialized) return;
             _ = RefreshAllAsync();
         }
 
@@ -229,6 +233,7 @@ namespace Winton.Views
         // ─── Color mode toggle ────────────────────────────────────────────────
         private void ColorMode_Changed(object sender, RoutedEventArgs e)
         {
+            if (!_initialized) return;
             _heatByRevenue = RevenueModeBtn.IsChecked == true;
             _ = ApplyHeatMapAsync();
         }
