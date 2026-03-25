@@ -50,7 +50,12 @@ namespace Winton.Views
             _sectionManager.SectionSelected += _sectionSelectedHandler;
 
             Loaded   += async (s, e) => await InitializeAsync();
-            Unloaded += (s, e)       => _sectionManager.SectionSelected -= _sectionSelectedHandler;
+            Unloaded += (s, e) =>
+            {
+                _sectionManager.SectionSelected -= _sectionSelectedHandler;
+                _filterDebounce?.Stop();
+                _drawerFilterDebounce?.Stop();
+            };
         }
 
         // ─── Initialisation ───────────────────────────────────────────────────
