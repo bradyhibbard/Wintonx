@@ -1,17 +1,28 @@
-﻿<Window x:Class="Winton.Views.AddSectionsWindow"
+<Window x:Class="Winton.Views.AddSectionsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Add Section"
-        Height="600"
+        Height="640"
         Width="340"
         WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
         ResizeMode="NoResize"
         Background="{DynamicResource SurfaceBackground}">
 
     <Window.Resources>
 
-        <!-- Shape option selector (RadioButtons that look like your app buttons) -->
-        <!-- NOTE: If your accent brush key is named differently, change AccentBrush below to match. -->
+        <!-- Themed TextBox -->
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Divider}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,5"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource PrimaryText}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+
+        <!-- Shape option selector -->
         <Style x:Key="ShapeOptionButtonStyle" TargetType="RadioButton">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryText}" />
             <Setter Property="Background" Value="{DynamicResource CardBackground}" />
@@ -34,20 +45,16 @@
                         </Border>
 
                         <ControlTemplate.Triggers>
-                            <!-- Hover -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBackground}" />
                             </Trigger>
-
-                            <!-- Selected -->
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
                                 <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBackground}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
-
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45" />
                             </Trigger>
@@ -59,173 +66,196 @@
 
     </Window.Resources>
 
-    <Grid Margin="16">
-        <!-- Main Card -->
-        <Border Background="{DynamicResource CardBackground}"
-                BorderBrush="{DynamicResource Divider}"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="18">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-            <Border.Effect>
-                <DropShadowEffect Color="#44000000"
-                                  BlurRadius="14"
-                                  ShadowDepth="3"/>
-            </Border.Effect>
+        <!-- Custom title bar -->
+        <Grid Grid.Row="0"
+              Background="{DynamicResource AppBackground}"
+              MouseDown="TitleBar_MouseDown">
+            <TextBlock Text="Add Section"
+                       VerticalAlignment="Center"
+                       Margin="15,0,0,0"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource PrimaryText}"/>
+            <Button Content="✕"
+                    Width="40"
+                    HorizontalAlignment="Right"
+                    Foreground="{DynamicResource PrimaryText}"
+                    Style="{StaticResource TitleBarButtonStyle}"
+                    Click="CloseWindow_Click"/>
+        </Grid>
 
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+        <!-- Content -->
+        <Grid Grid.Row="1" Margin="16">
+            <!-- Main Card -->
+            <Border Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource Divider}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="18">
 
-                <!-- Header -->
-                <StackPanel Grid.Row="0" Margin="0,0,0,14">
-                    <TextBlock Text="Insert"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource PrimaryText}"/>
-                    <TextBlock Text="Choose a shape, then adjust size and rotation."
-                               Margin="0,6,0,0"
-                               Foreground="{DynamicResource SecondaryText}"
-                               FontSize="12"/>
-                </StackPanel>
+                <Border.Effect>
+                    <DropShadowEffect Color="#44000000"
+                                      BlurRadius="14"
+                                      ShadowDepth="3"/>
+                </Border.Effect>
 
-                <!-- Shape Selection (default Square selected) -->
-                <StackPanel Grid.Row="1" Margin="0,0,0,14">
-                    <TextBlock Text="Shape"
-                               Foreground="{DynamicResource SecondaryText}"
-                               Margin="2,0,0,6"/>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                    <RadioButton x:Name="SquareOption"
-                                 Content="Square"
-                                 GroupName="ShapeOptions"
-                                 IsChecked="True"
-                                 Checked="SquareOption_Checked"
-                                 Style="{StaticResource ShapeOptionButtonStyle}"
-                                 Margin="0,0,0,8"/>
+                    <!-- Header -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                        <TextBlock Text="Insert"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource PrimaryText}"/>
+                        <TextBlock Text="Choose a shape, then adjust size and rotation."
+                                   Margin="0,6,0,0"
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   FontSize="12"/>
+                    </StackPanel>
 
-                    <RadioButton x:Name="CircleOption"
-                                 Content="Circle"
-                                 GroupName="ShapeOptions"
-                                 Checked="CircleOption_Checked"
-                                 Style="{StaticResource ShapeOptionButtonStyle}"
-                                 Margin="0,0,0,8"/>
+                    <!-- Shape Selection -->
+                    <StackPanel Grid.Row="1" Margin="0,0,0,14">
+                        <TextBlock Text="Shape"
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   Margin="2,0,0,6"/>
 
-                    <RadioButton x:Name="TriangleOption"
-                                 Content="Triangle"
-                                 GroupName="ShapeOptions"
-                                 Checked="TriangleOption_Checked"
-                                 Style="{StaticResource ShapeOptionButtonStyle}"/>
-                </StackPanel>
+                        <RadioButton x:Name="SquareOption"
+                                     Content="Square"
+                                     GroupName="ShapeOptions"
+                                     IsChecked="True"
+                                     Checked="SquareOption_Checked"
+                                     Style="{StaticResource ShapeOptionButtonStyle}"
+                                     Margin="0,0,0,8"/>
 
-                <!-- Dimension + Rotation Controls -->
-                <StackPanel Grid.Row="2" Margin="0,0,0,14">
-                    <TextBlock Text="Dimensions"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource PrimaryText}"
-                               Margin="0,0,0,10"/>
+                        <RadioButton x:Name="CircleOption"
+                                     Content="Circle"
+                                     GroupName="ShapeOptions"
+                                     Checked="CircleOption_Checked"
+                                     Style="{StaticResource ShapeOptionButtonStyle}"
+                                     Margin="0,0,0,8"/>
 
-                    <Grid>
+                        <RadioButton x:Name="TriangleOption"
+                                     Content="Triangle"
+                                     GroupName="ShapeOptions"
+                                     Checked="TriangleOption_Checked"
+                                     Style="{StaticResource ShapeOptionButtonStyle}"/>
+                    </StackPanel>
+
+                    <!-- Dimension + Rotation Controls -->
+                    <StackPanel Grid.Row="2" Margin="0,0,0,14">
+                        <TextBlock Text="Dimensions"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   Margin="0,0,0,10"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                <TextBlock Text="Width"
+                                           Foreground="{DynamicResource SecondaryText}"
+                                           FontSize="12"
+                                           Margin="0,0,0,6"
+                                           HorizontalAlignment="Center"/>
+                                <TextBox x:Name="WidthBox"
+                                         Text="50"
+                                         HorizontalContentAlignment="Center"
+                                         PreviewTextInput="NumericOnly_PreviewTextInput"
+                                         LostFocus="WidthBox_LostFocus"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                                <TextBlock Text="Height"
+                                           Foreground="{DynamicResource SecondaryText}"
+                                           FontSize="12"
+                                           Margin="0,0,0,6"
+                                           HorizontalAlignment="Center"/>
+                                <TextBox x:Name="HeightBox"
+                                         Text="50"
+                                         HorizontalContentAlignment="Center"
+                                         PreviewTextInput="NumericOnly_PreviewTextInput"
+                                         LostFocus="HeightBox_LostFocus"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Rotation"
+                                           Foreground="{DynamicResource SecondaryText}"
+                                           FontSize="12"
+                                           Margin="0,0,0,6"
+                                           HorizontalAlignment="Center"/>
+                                <TextBox x:Name="RotationBox"
+                                         Text="0"
+                                         HorizontalContentAlignment="Center"
+                                         PreviewTextInput="NumericOnly_PreviewTextInput"
+                                         LostFocus="RotationBox_LostFocus"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Shape Preview -->
+                    <StackPanel Grid.Row="3" Margin="0,0,0,14">
+                        <TextBlock Text="Preview"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   Margin="0,0,0,10"/>
+
+                        <Border BorderThickness="1"
+                                BorderBrush="{DynamicResource Divider}"
+                                CornerRadius="10"
+                                Height="130"
+                                Padding="10"
+                                Background="{DynamicResource SurfaceBackground}">
+                            <Canvas x:Name="PreviewCanvas"
+                                    Background="Transparent"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Spacer -->
+                    <Grid Grid.Row="4"/>
+
+                    <!-- Action Buttons -->
+                    <Grid Grid.Row="5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Width -->
-                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                            <TextBlock Text="Width"
-                                       Foreground="{DynamicResource SecondaryText}"
-                                       FontSize="12"
-                                       Margin="0,0,0,6"
-                                       HorizontalAlignment="Center"/>
-                            <TextBox x:Name="WidthBox"
-                                     Text="50"
-                                     HorizontalContentAlignment="Center"
-                                     PreviewTextInput="NumericOnly_PreviewTextInput"
-                                     LostFocus="WidthBox_LostFocus"/>
-                        </StackPanel>
+                        <Button Grid.Column="0"
+                                Content="Apply"
+                                Style="{StaticResource NavButton}"
+                                Click="ApplyShape_Click"
+                                Padding="12,8"/>
 
-                        <!-- Height -->
-                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
-                            <TextBlock Text="Height"
-                                       Foreground="{DynamicResource SecondaryText}"
-                                       FontSize="12"
-                                       Margin="0,0,0,6"
-                                       HorizontalAlignment="Center"/>
-                            <TextBox x:Name="HeightBox"
-                                     Text="50"
-                                     HorizontalContentAlignment="Center"
-                                     PreviewTextInput="NumericOnly_PreviewTextInput"
-                                     LostFocus="HeightBox_LostFocus"/>
-                        </StackPanel>
-
-                        <!-- Rotation -->
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Rotation"
-                                       Foreground="{DynamicResource SecondaryText}"
-                                       FontSize="12"
-                                       Margin="0,0,0,6"
-                                       HorizontalAlignment="Center"/>
-                            <TextBox x:Name="RotationBox"
-                                     Text="0"
-                                     HorizontalContentAlignment="Center"
-                                     PreviewTextInput="NumericOnly_PreviewTextInput"
-                                     LostFocus="RotationBox_LostFocus"/>
-                        </StackPanel>
+                        <Button Grid.Column="2"
+                                Content="Close"
+                                Style="{StaticResource NavButton}"
+                                Click="CloseWindow_Click"
+                                Padding="12,8"/>
                     </Grid>
-                </StackPanel>
 
-                <!-- Shape Preview -->
-                <StackPanel Grid.Row="3" Margin="0,0,0,14">
-                    <TextBlock Text="Preview"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource PrimaryText}"
-                               Margin="0,0,0,10"/>
-
-                    <Border BorderThickness="1"
-                            BorderBrush="{DynamicResource Divider}"
-                            CornerRadius="10"
-                            Height="130"
-                            Padding="10"
-                            Background="{DynamicResource SurfaceBackground}">
-                        <Canvas x:Name="PreviewCanvas"
-                                Background="Transparent"/>
-                    </Border>
-                </StackPanel>
-
-                <!-- Spacer -->
-                <Grid Grid.Row="4"/>
-
-                <!-- Action Buttons -->
-                <Grid Grid.Row="5">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Button Grid.Column="0"
-                            Content="Apply"
-                            Style="{StaticResource NavButton}"
-                            Click="ApplyShape_Click"
-                            Padding="12,8"/>
-
-                    <Button Grid.Column="2"
-                            Content="Close"
-                            Style="{StaticResource NavButton}"
-                            Click="CloseWindow_Click"
-                            Padding="12,8"/>
                 </Grid>
-
-            </Grid>
-        </Border>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
