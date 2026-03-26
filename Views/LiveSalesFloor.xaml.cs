@@ -66,8 +66,82 @@ namespace Winton.Views
             await LoadSectionsAsync();
             await LoadPerimeterAsync();
             await LoadPartitionsAsync();
+            FitContentToView();
             await RefreshKpisAsync();
             await ApplyHeatMapAsync();
+        }
+
+        // ─── Fit canvas to content ────────────────────────────────────────────
+        private void FitContentToView()
+        {
+            const double padding = 20.0;
+
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+            bool hasContent = false;
+
+            // Measure section buttons
+            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+            {
+                double left = Canvas.GetLeft(btn);
+                double top  = Canvas.GetTop(btn);
+                if (double.IsNaN(left) || double.IsNaN(top)) continue;
+
+                minX = Math.Min(minX, left);
+                minY = Math.Min(minY, top);
+                maxX = Math.Max(maxX, left + btn.Width);
+                maxY = Math.Max(maxY, top  + btn.Height);
+                hasContent = true;
+            }
+
+            // Measure perimeter and partition polylines
+            foreach (var poly in LiveFloorCanvas.Children.OfType<Polyline>())
+            {
+                foreach (var pt in poly.Points)
+                {
+                    minX = Math.Min(minX, pt.X);
+                    minY = Math.Min(minY, pt.Y);
+                    maxX = Math.Max(maxX, pt.X);
+                    maxY = Math.Max(maxY, pt.Y);
+                    hasContent = true;
+                }
+            }
+
+            if (!hasContent) return;
+
+            double offsetX = -minX + padding;
+            double offsetY = -minY + padding;
+            double newW    = maxX - minX + padding * 2;
+            double newH    = maxY - minY + padding * 2;
+
+            // Shift section buttons
+            foreach (var btn in LiveFloorCanvas.Children.OfType<Button>())
+            {
+                Canvas.SetLeft(btn, Canvas.GetLeft(btn) + offsetX);
+                Canvas.SetTop(btn,  Canvas.GetTop(btn)  + offsetY);
+            }
+
+            // Shift perimeter and partition polylines
+            foreach (var poly in LiveFloorCanvas.Children.OfType<Polyline>())
+            {
+                var shifted = poly.Points
+                    .Select(pt => new Point(pt.X + offsetX, pt.Y + offsetY))
+                    .ToList();
+                poly.Points = new PointCollection(shifted);
+            }
+
+            // Resize canvases to match content
+            LiveFloorCanvas.Width        = newW;
+            LiveFloorCanvas.Height       = newH;
+            RevenueOverlayCanvas.Width   = newW;
+            RevenueOverlayCanvas.Height  = newH;
+
+            // Resize the parent Grid so the Viewbox scales correctly
+            if (LiveFloorCanvas.Parent is Grid parentGrid)
+            {
+                parentGrid.Width  = newW;
+                parentGrid.Height = newH;
+            }
         }
 
         private async Task LoadSectionsAsync()
