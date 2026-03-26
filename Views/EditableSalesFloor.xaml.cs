@@ -33,6 +33,14 @@ namespace Winton.Views
         private int _saveFlashVersion = 0;
         private Section _copiedSection;
 
+        // --------------------------------------------------
+        // Zoom State
+        // --------------------------------------------------
+        private double _zoomLevel = 1.0;
+        private const double ZoomStep = 0.1;
+        private const double ZoomMin = 0.2;
+        private const double ZoomMax = 4.0;
+
 
 
 
@@ -173,11 +181,12 @@ namespace Winton.Views
         {
             DrawGrid();
 
-            // Check and re-add the perimeter line only if it is not already in the canvas
             if (!SalesFloorCanvas.Children.Contains(_perimeterLine))
-            {
                 SalesFloorCanvas.Children.Add(_perimeterLine);
-            }
+            if (!SalesFloorCanvas.Children.Contains(_perimeterPreviewLine))
+                SalesFloorCanvas.Children.Add(_perimeterPreviewLine);
+            if (!SalesFloorCanvas.Children.Contains(_partitionPreviewLine))
+                SalesFloorCanvas.Children.Add(_partitionPreviewLine);
         }
 
         private static string GetShapeTypeFromShape(Shape s)
@@ -1356,5 +1365,46 @@ namespace Winton.Views
         }
 
         #endregion
+
+        // --------------------------------------------------
+        // Zoom
+        // --------------------------------------------------
+
+        private void ApplyZoom()
+        {
+            SalesFloorCanvas.LayoutTransform = new ScaleTransform(_zoomLevel, _zoomLevel);
+            ZoomLevelText.Text = $"{(int)Math.Round(_zoomLevel * 100)}%";
+        }
+
+        private void ZoomIn_Click(object sender, RoutedEventArgs e)
+        {
+            _zoomLevel = Math.Min(_zoomLevel + ZoomStep, ZoomMax);
+            ApplyZoom();
+        }
+
+        private void ZoomOut_Click(object sender, RoutedEventArgs e)
+        {
+            _zoomLevel = Math.Max(_zoomLevel - ZoomStep, ZoomMin);
+            ApplyZoom();
+        }
+
+        private void ZoomReset_Click(object sender, RoutedEventArgs e)
+        {
+            _zoomLevel = 1.0;
+            ApplyZoom();
+        }
+
+        private void FloorScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (Keyboard.Modifiers != ModifierKeys.Control)
+                return;
+
+            e.Handled = true;
+            if (e.Delta > 0)
+                _zoomLevel = Math.Min(_zoomLevel + ZoomStep, ZoomMax);
+            else
+                _zoomLevel = Math.Max(_zoomLevel - ZoomStep, ZoomMin);
+            ApplyZoom();
+        }
     }
 }
