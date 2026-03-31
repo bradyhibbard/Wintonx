@@ -16,10 +16,15 @@ namespace Winton
     {
         private EditableSalesFloor _salesFloor;
         private Button _activeNavBtn;
+        private bool _isDarkMode;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            // Sync toggle icon with the theme that was already applied at startup
+            _isDarkMode = Services.ThemeConfig.LoadTheme() == "Dark";
+            ThemeToggleButton.Content = _isDarkMode ? "☀" : "🌙";
 
             Loaded += async (s, e) =>
             {
@@ -115,6 +120,15 @@ namespace Winton
                 // If dragging while maximized, restore first (optional Windows-like behavior)
                 DragMove();
             }
+        }
+
+        private void ThemeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _isDarkMode = !_isDarkMode;
+            var themeName = _isDarkMode ? "Dark" : "Light";
+            (App.Current as App).SetTheme(themeName);
+            Services.ThemeConfig.SaveTheme(themeName);
+            ThemeToggleButton.Content = _isDarkMode ? "☀" : "🌙";
         }
 
         private void Minimize_Click(object sender, RoutedEventArgs e)
