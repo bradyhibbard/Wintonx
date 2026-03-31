@@ -10,6 +10,10 @@ namespace Winton
         {
             base.OnStartup(e);
 
+            // Apply saved theme before any UI is shown
+            var savedTheme = Services.ThemeConfig.LoadTheme();
+            SetTheme(savedTheme);
+
             // Keep the app alive while Splash is open
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
