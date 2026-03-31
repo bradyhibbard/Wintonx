@@ -9,7 +9,6 @@ namespace Winton.Helpers
     public class SectionInteraction
     {
         private bool _isDragging = false;
-        private bool _isResizing = false;
         private Point _startPosition;
         private UIElement _selectedElement;
 
@@ -62,7 +61,6 @@ namespace Winton.Helpers
             _selectedElement?.ReleaseMouseCapture();
         }
 
-        // 🔥 New Method: Find the Parent Canvas Correctly
         private Canvas GetParentCanvas(UIElement element)
         {
             DependencyObject parent = element;

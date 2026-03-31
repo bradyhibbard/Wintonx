@@ -65,6 +65,9 @@ namespace Winton.ViewModels
 
         public Func<double, string> Formatter { get; } = v => ((decimal)v).ToString("C0");
 
+        private static readonly Brush GreenBrush = new SolidColorBrush(Color.FromRgb(52, 199, 89));
+        private static readonly Brush RedBrush   = new SolidColorBrush(Color.FromRgb(255, 69, 58));
+
         // Kept for DetailedChartWindow compatibility
         public SeriesCollection CurrentYearRevenue  { get; private set; } = new();
         public SeriesCollection PreviousYearRevenue { get; private set; } = new();
@@ -188,9 +191,7 @@ namespace Winton.ViewModels
             double pct = (double)((current - previous) / Math.Abs(previous) * 100);
             bool positive = pct >= 0;
             string arrow = positive ? "▲" : "▼";
-            Brush brush   = positive
-                ? new SolidColorBrush(Color.FromRgb(52, 199, 89))
-                : new SolidColorBrush(Color.FromRgb(255, 69, 58));
+            Brush brush   = positive ? GreenBrush : RedBrush;
             return ($"{arrow} {Math.Abs(pct):F0}% {label}", brush);
         }
 

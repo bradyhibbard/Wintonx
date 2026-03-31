@@ -10,6 +10,8 @@ namespace Winton.Views
     /// </summary>
     public partial class ReportsListControl : UserControl
     {
+        private const string DateFormat = "MMM dd, yyyy";
+
         public List<ReportDateDisplay> Reports { get; set; }
         public ReportsListControl()
         {
@@ -21,16 +23,9 @@ namespace Winton.Views
         {
             try
             {
-                // Get reports from the last 2 years asynchronously
                 var reportDates = await SalesDataServices.GetReportsFromLastTwoYearsAsync();
-
-                // Ensure data is not null before using it
-                if (reportDates != null)
-                {
-                    // Format dates and bind to the list
-                    Reports = reportDates.Select(r => new ReportDateDisplay { DisplayDate = r.ToString("MMM dd, yyyy"), ReportDate = r }).ToList();
-                    lstReports.ItemsSource = Reports;
-                }
+                Reports = reportDates.Select(r => new ReportDateDisplay { DisplayDate = r.ToString(DateFormat), ReportDate = r }).ToList();
+                lstReports.ItemsSource = Reports;
             }
             catch (Exception ex)
             {
@@ -66,14 +61,12 @@ namespace Winton.Views
                 string filename = dlg.FileName;
 
                 // Open a dialog to get the report date
-                var dialog = new FileNameWindow(DateTime.Now.ToString("MMM dd, yyyy"), DateTime.Now);
+                var dialog = new FileNameWindow(DateTime.Now.ToString(DateFormat), DateTime.Now);
 
                 if (dialog.ShowDialog() == true)
                 {
                     DateTime reportDate = dialog.ReportDate;
-
-                    // Automatically update the filename to match the selected date
-                    string newFilename = reportDate.ToString("MMM dd, yyyy");
+                    string newFilename = reportDate.ToString(DateFormat);
 
                     try
                     {
