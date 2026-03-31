@@ -106,7 +106,6 @@ namespace Winton
 
         private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleWindowState();
 
-        //adding a comment for testing git
         private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2 && e.ChangedButton == MouseButton.Left)
@@ -183,10 +182,7 @@ namespace Winton
             MainContent.Content = _salesFloor;
         }
 
-        public EditableSalesFloor SalesFloorInstance
-        {
-            get { return _salesFloor; }
-        }
+        public EditableSalesFloor SalesFloorInstance => _salesFloor;
 
         public void SetMainContent(UserControl control)
         {

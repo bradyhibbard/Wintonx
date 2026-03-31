@@ -23,7 +23,7 @@ namespace Winton.ViewModels
         public int TotalQuantitySold { get; set; }
 
         public decimal AvgRevenuePerProduct =>
-            ProductBreakdown != null && ProductBreakdown.Count > 0
+            ProductBreakdown.Count > 0
                 ? Math.Round(TotalRevenue / ProductBreakdown.Count, 2)
                 : 0;
 

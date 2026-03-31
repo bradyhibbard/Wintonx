@@ -16,7 +16,7 @@ namespace Winton.Views
         {
             InitializeComponent();
             _reportDate = reportDate;
-            Loaded += async (s, e) => await LoadReportDetailsAsync(); ;
+            Loaded += async (s, e) => await LoadReportDetailsAsync();
         }
 
         private async Task LoadReportDetailsAsync()

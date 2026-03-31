@@ -13,6 +13,8 @@ namespace Winton.Services
     /// </summary>
     internal class ImportServices
     {
+        private static readonly HashSet<string> ValidTransactionCodes = new() { "00", "05", "07", "30", "37" };
+
         /// <summary>
         /// Imports a sales report from an Excel file and saves it to the database.
         /// </summary>
@@ -58,26 +60,17 @@ namespace Winton.Services
                                         continue;
                                     }
 
-                                    // Determine revenue based on transaction code
-                                    decimal revenue = 0;
-                                    bool validTransaction = transactionCode switch
-                                    {
-                                        "00" or "05" or "07" => true,  // Normal sales transactions
-                                        "30" or "37" => true,  // Returns/refunds (negative revenue)
-                                        _ => false
-                                    };
-
-                                    if (!validTransaction)
+                                    if (!ValidTransactionCodes.Contains(transactionCode))
                                     {
                                         Debug.WriteLine($"[ImportServices] Ignoring row {row}: unsupported transaction code {transactionCode}.");
                                         continue;
                                     }
 
-                                    revenue = transactionCode switch
+                                    decimal revenue = transactionCode switch
                                     {
-                                        "00" or "05" or "07" => price * quantitySold,  // Standard sales
-                                        "30" or "37" => -(price * quantitySold), // Refunds
-                                        _ => 0
+                                        "00" or "05" or "07" => price * quantitySold,
+                                        "30" or "37"         => -(price * quantitySold),
+                                        _                    => 0
                                     };
 
                                     // Insert data into SalesData table
@@ -218,9 +211,7 @@ namespace Winton.Services
                             continue;
                         }
 
-                        // Check transaction code
-                        var validCodes = new HashSet<string> { "00", "05", "07", "30", "37" };
-                        if (string.IsNullOrEmpty(transactionCode) || !validCodes.Contains(transactionCode))
+                        if (string.IsNullOrEmpty(transactionCode) || !ValidTransactionCodes.Contains(transactionCode))
                         {
                             Debug.WriteLine($"[ImportServices] Skipping row {rowIndex}: invalid transaction code '{transactionCode}'.");
                             continue;

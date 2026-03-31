@@ -11,7 +11,7 @@ namespace Winton.Services
     /// </summary>
     internal class SalesDataServices
     {
-        private static string ConnectionString => $"Data Source={DatabaseConfig.DbPath};";
+        private static readonly string ConnectionString = $"Data Source={DatabaseConfig.DbPath};";
 
         /// <summary>
         /// Retrieves the total revenue for the current year.
@@ -72,17 +72,18 @@ namespace Winton.Services
                 using var connection = new SqliteConnection(ConnectionString);
                 await connection.OpenAsync();
 
+                const string query = @"
+                    SELECT SUM(Revenue)
+                    FROM SalesData
+                    WHERE strftime('%Y', SaleDate) = @Year AND strftime('%m', SaleDate) = @Month";
+
+                using var command = new SqliteCommand(query, connection);
+                command.Parameters.AddWithValue("@Year", year.ToString());
+                command.Parameters.Add("@Month", SqliteType.Text);
+
                 for (int month = 1; month <= 12; month++)
                 {
-                    string query = @"
-                        SELECT SUM(Revenue) 
-                        FROM SalesData 
-                        WHERE strftime('%Y', SaleDate) = @Year AND strftime('%m', SaleDate) = @Month";
-
-                    using var command = new SqliteCommand(query, connection);
-                    command.Parameters.AddWithValue("@Year", year.ToString());
-                    command.Parameters.AddWithValue("@Month", month.ToString("D2"));
-
+                    command.Parameters["@Month"].Value = month.ToString("D2");
                     var result = await command.ExecuteScalarAsync();
                     values.Add(result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0);
                 }
@@ -238,12 +239,12 @@ namespace Winton.Services
 
             try
             {
-                using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+                using var connection = new SqliteConnection(ConnectionString);
                 await connection.OpenAsync();
 
                 string query = @"
-            SELECT ItemNumber, VendorModel, Description, Price, QuantitySold, Revenue, Cat, Grp, TransactionCode 
-            FROM SalesData 
+            SELECT ItemNumber, VendorModel, Description, Price, QuantitySold, Revenue, Cat, Grp, TransactionCode
+            FROM SalesData
             WHERE date(SaleDate) = date(@ReportDate)";
 
                 using var command = new SqliteCommand(query, connection);
