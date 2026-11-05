@@ -115,22 +115,17 @@ namespace Winton.Services
         }
 
 
+        /// <summary>
+        /// Folder holding database backups.
+        /// </summary>
+        public static string BackupDirectory =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Winton", "DatabaseBackups");
+
         public static async Task<string> BackupDatabaseAsync()
         {
             try
             {
-                string backupDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Winton", "DatabaseBackups");
-
-                if (!Directory.Exists(backupDirectory))
-                {
-                    Directory.CreateDirectory(backupDirectory);
-                }
-
-                string backupFileName = $"DatabaseBackup_{DateTime.Now:yyyyMMdd_HHmmss}.db";
-                string backupFilePath = Path.Combine(backupDirectory, backupFileName);
-
-                await Task.Run(() => File.Copy(dbPath, backupFilePath, overwrite: true));
-
+                string backupFilePath = await CopyDatabaseToBackupAsync("DatabaseBackup");
                 return $"Database backup successful! Backup created at: {backupFilePath}";
             }
             catch (Exception ex)
@@ -139,25 +134,30 @@ namespace Winton.Services
             }
         }
 
-        public static async Task<string> RestoreDatabaseAsync()
+        private static async Task<string> CopyDatabaseToBackupAsync(string prefix)
+        {
+            Directory.CreateDirectory(BackupDirectory);
+            string backupFilePath = Path.Combine(BackupDirectory, $"{prefix}_{DateTime.Now:yyyyMMdd_HHmmss}.db");
+
+            // Pooled connections can keep the database file open.
+            SqliteConnection.ClearAllPools();
+            await Task.Run(() => File.Copy(dbPath, backupFilePath, overwrite: true));
+            return backupFilePath;
+        }
+
+        /// <summary>
+        /// Replaces the database with a backup, first saving a copy of the current database.
+        /// </summary>
+        public static async Task<string> RestoreDatabaseAsync(string backupFilePath)
         {
             try
             {
-                string backupDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Winton", "DatabaseBackups");
+                string safetyCopy = await CopyDatabaseToBackupAsync("BeforeRestore");
 
-                var backupFiles = Directory.GetFiles(backupDirectory, "*.db")
-                                           .OrderByDescending(File.GetCreationTime)
-                                           .ToList();
+                SqliteConnection.ClearAllPools();
+                await Task.Run(() => File.Copy(backupFilePath, dbPath, overwrite: true));
 
-                if (!backupFiles.Any())
-                {
-                    return "No backup files found!";
-                }
-
-                string mostRecentBackup = backupFiles.First();
-                await Task.Run(() => File.Copy(mostRecentBackup, dbPath, overwrite: true));
-
-                return "Database restored successfully from the most recent backup!";
+                return $"Database restored successfully. Your previous data was saved to: {safetyCopy}";
             }
             catch (Exception ex)
             {

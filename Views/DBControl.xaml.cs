@@ -37,10 +37,24 @@ namespace Winton.Views
 
         private async void RestoreDatabase_Click(object sender, RoutedEventArgs e)
         {
-            // Call the RestoreDatabase function asynchronously
-            string result = await DatabaseService.RestoreDatabaseAsync();
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Choose a backup to restore",
+                Filter = "Database Backups|*.db",
+                InitialDirectory = DatabaseService.BackupDirectory
+            };
 
-            // Display the result (success or error message) in a MessageBox
+            if (dialog.ShowDialog() != true) return;
+
+            var confirm = MessageBox.Show(
+                $"Replace all current data with this backup?\n\n{System.IO.Path.GetFileName(dialog.FileName)}\n\nA copy of your current data will be saved first.",
+                "Restore Database",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            string result = await DatabaseService.RestoreDatabaseAsync(dialog.FileName);
             MessageBox.Show(result, "Database Restore", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 

@@ -57,15 +57,15 @@ namespace Winton.Views
             var openFileDialog = new OpenFileDialog
             {
                 DefaultExt = ".xlsx",
-                Filter = "Excel Files|*.xls;*.xlsx;*.xlsm|CSV Files|*.csv"
+                Filter = "Excel Files|*.xlsx;*.xlsm"
             };
 
             if (openFileDialog.ShowDialog() == true)
             {
                 try
                 {
-                    await ImportServices.ImportProductListAsync(openFileDialog.FileName);
-                    MessageBox.Show("Import successful.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    int productCount = await ImportServices.ImportProductListAsync(openFileDialog.FileName);
+                    MessageBox.Show($"Imported {productCount:N0} products.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                     await LoadProductsAsync(); // Refresh the product list
                 }
                 catch (Exception ex)

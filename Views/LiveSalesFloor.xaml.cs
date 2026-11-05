@@ -35,11 +35,14 @@ namespace Winton.Views
         private DispatcherTimer _drawerFilterDebounce;
 
         private bool _initialized = false;
+        private bool _loadingDrawerDate = false;
 
         // ─── Constructor ──────────────────────────────────────────────────────
         public LiveSalesFloor()
         {
             InitializeComponent();
+
+            _perimeterLine.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
 
             _sectionManager = new SectionManager(LiveFloorCanvas, this);
 
@@ -207,9 +210,9 @@ namespace Winton.Views
             _periodEnd   = DateTime.Today;
             _periodStart = preset switch
             {
-                "Last 7 Days"   => _periodEnd.AddDays(-7),
+                "Last 7 Days"   => _periodEnd.AddDays(-6),
                 "This Month"    => new DateTime(_periodEnd.Year, _periodEnd.Month, 1),
-                "Last 30 Days"  => _periodEnd.AddDays(-30),
+                "Last 30 Days"  => _periodEnd.AddDays(-29),
                 "This Quarter"  => new DateTime(_periodEnd.Year, ((_periodEnd.Month - 1) / 3) * 3 + 1, 1),
                 "Year to Date"  => new DateTime(_periodEnd.Year, 1, 1),
                 _               => _periodEnd.AddMonths(-1)
@@ -223,10 +226,7 @@ namespace Winton.Views
         private async Task RefreshAllAsync()
         {
             await RefreshKpisAsync();
-            await ApplyHeatMapAsync();
-
-            if (AnyFilterActive())
-                _ = ApplyFiltersAsync();
+            await RefreshFloorAsync();
 
             if (_currentSectionId != null)
                 await RefreshDrawerStatsAsync();
@@ -248,6 +248,16 @@ namespace Winton.Views
             {
                 Debug.WriteLine($"[LiveSalesFloor] RefreshKpisAsync: {ex}");
             }
+        }
+
+        /// <summary>
+        /// Recolors the floor, then reapplies any active filters so they stay in effect.
+        /// </summary>
+        private async Task RefreshFloorAsync()
+        {
+            await ApplyHeatMapAsync();
+            if (AnyFilterActive())
+                await ApplyFiltersAsync();
         }
 
         // ─── Heat map ─────────────────────────────────────────────────────────
@@ -315,7 +325,7 @@ namespace Winton.Views
             if (!_initialized) return;
             _heatByRevenue = RevenueModeBtn.IsChecked == true;
             LegendLabel.Text = _heatByRevenue ? "REVENUE" : "UNITS SOLD";
-            _ = ApplyHeatMapAsync();
+            _ = RefreshFloorAsync();
         }
 
         // ─── Floor filters ────────────────────────────────────────────────────
@@ -456,6 +466,18 @@ namespace Winton.Views
 
         private async Task RefreshDrawerStatsAsync()
         {
+            await RefreshDrawerTotalsAsync();
+
+            var products = await ProductPlacementServices.GetProductsBySectionAsync(_currentSectionId);
+            DrawerProductCount.Text = products.Count.ToString();
+
+            DrawerCurrentProductsListBox.Items.Clear();
+            foreach (var p in products)
+                DrawerCurrentProductsListBox.Items.Add(p.ItemNumber);
+        }
+
+        private async Task RefreshDrawerTotalsAsync()
+        {
             var sectionId = _currentSectionId;
 
             decimal revenue = await SalesDataServices.GetRevenueBySectionAsync(sectionId, _periodStart, _periodEnd);
@@ -463,13 +485,6 @@ namespace Winton.Views
 
             var qtyMap = await SalesDataServices.GetQuantityBySectionAsync(_periodStart, _periodEnd);
             DrawerQty.Text = qtyMap.GetValueOrDefault(sectionId, 0).ToString("N0");
-
-            var products = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
-            DrawerProductCount.Text = products.Count.ToString();
-
-            DrawerCurrentProductsListBox.Items.Clear();
-            foreach (var p in products)
-                DrawerCurrentProductsListBox.Items.Add(p.ItemNumber);
         }
 
         private void CloseSectionDrawer()
@@ -539,14 +554,20 @@ namespace Winton.Views
             var category = DrawerCategoryFilter.Text.Trim().ToLowerInvariant();
             var product  = DrawerProductFilter.Text.Trim().ToLowerInvariant();
 
-            var filtered = _allProducts
+            const int maxResults = 200;
+
+            var matches = _allProducts
                 .Where(p =>
                     (string.IsNullOrEmpty(vendor)   || p.Vendor.ToLowerInvariant().Contains(vendor))   &&
                     (string.IsNullOrEmpty(category) || p.Cat.ToLowerInvariant().Contains(category))    &&
                     (string.IsNullOrEmpty(product)  || p.ItemNumber.ToLowerInvariant().Contains(product)))
-                .Take(200)
                 .ToList();
 
+            var filtered = matches.Take(maxResults).ToList();
+
+            DrawerSelectAll.Content = matches.Count > maxResults
+                ? $"Select All (first {maxResults} of {matches.Count:N0})"
+                : "Select All";
             DrawerSelectAll.IsChecked = false;
             DrawerProductsListBox.Items.Clear();
 
@@ -593,35 +614,48 @@ namespace Winton.Views
 
             await RefreshDrawerStatsAsync();
             await RefreshKpisAsync();
-            await ApplyHeatMapAsync();
+            await RefreshFloorAsync();
         }
 
         // ─── Drawer: Current products ─────────────────────────────────────────
         private async void DrawerCurrentProducts_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (DrawerCurrentProductsListBox.SelectedItem is string itemNumber)
+            DateTime? datePlaced = null;
+
+            if (DrawerCurrentProductsListBox.SelectedItem is string itemNumber && !string.IsNullOrEmpty(_currentSectionId))
             {
-                var placement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
-                DrawerDatePicker.SelectedDate = placement?.DatePlaced;
+                var placement = await ProductPlacementServices.GetPlacementInSectionAsync(itemNumber, _currentSectionId);
+                datePlaced = placement?.DatePlaced;
             }
-            else
-            {
-                DrawerDatePicker.SelectedDate = null;
-            }
+
+            // Showing the saved date isn't an edit, so it must not save anything.
+            _loadingDrawerDate = true;
+            DrawerDatePicker.SelectedDate = datePlaced;
+            _loadingDrawerDate = false;
         }
 
         private async void DrawerDatePicker_Changed(object sender, SelectionChangedEventArgs e)
         {
+            if (_loadingDrawerDate) return;
+
             if (DrawerCurrentProductsListBox.SelectedItem is string itemNumber &&
                 DrawerDatePicker.SelectedDate.HasValue &&
                 !string.IsNullOrEmpty(_currentSectionId))
             {
-                var placement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
-                if (placement != null)
+                try
                 {
                     await ProductPlacementServices.UpdateDatePlacedAsync(
-                        placement.ProductID, _currentSectionId, DrawerDatePicker.SelectedDate.Value);
-                    Debug.WriteLine($"[LiveSalesFloor] DatePlaced updated: {itemNumber} → {DrawerDatePicker.SelectedDate.Value:d}");
+                        itemNumber, _currentSectionId, DrawerDatePicker.SelectedDate.Value);
+
+                    // Sales are counted from this date, so the totals can change.
+                    await RefreshDrawerTotalsAsync();
+                    await RefreshKpisAsync();
+                    await RefreshFloorAsync();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"The date could not be saved.\n\n{ex.Message}", "Date Placed",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -639,26 +673,21 @@ namespace Winton.Views
                 return;
             }
 
-            foreach (var itemNumber in selected)
+            try
             {
-                var placement = await ProductPlacementServices.GetCurrentProductPlacementAsync(itemNumber);
-                if (placement != null && placement.SectionID == _currentSectionId)
-                {
-                    await ProductPlacementServices.RemoveProductFromSectionAsync(
-                        placement.ProductID, _currentSectionId, DateTime.Now);
-
-                    await ProductPlacementServices.ArchiveProductPlacementAsync(
-                        productId:     placement.ProductID,
-                        sectionId:     _currentSectionId,
-                        removalNotes:  "Removed manually",
-                        quantitySold:  placement.QuantitySold,
-                        revenue:       placement.Revenue);
-                }
+                foreach (var itemNumber in selected)
+                    await ProductPlacementServices.RemoveItemFromSectionAsync(
+                        itemNumber, _currentSectionId, DateTime.Now, "Removed manually");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"The product could not be removed.\n\n{ex.Message}", "Remove Products",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
             await RefreshDrawerStatsAsync();
             await RefreshKpisAsync();
-            await ApplyHeatMapAsync();
+            await RefreshFloorAsync();
         }
 
         // ─── Drawer: Archive ──────────────────────────────────────────────────
@@ -689,22 +718,31 @@ namespace Winton.Views
                 var activeProducts       = await ProductPlacementServices.GetProductsBySectionAsync(sectionId);
                 var archivedProducts     = await ProductPlacementServices.GetArchivedProductsBySectionAsync(sectionId);
 
+                var itemStats = await SalesDataServices.GetItemStatsForSectionAsync(sectionId, _periodStart, _periodEnd);
+
+                // One row per item, whether it's still in the section or was removed.
                 var breakdown = activeProducts
-                    .Select(p => new ProductBreakdownItem
+                    .Select(p => new { p.ItemNumber, IsActive = true, p.DatePlaced })
+                    .Concat(archivedProducts.Select(a => new { a.ItemNumber, IsActive = false, a.DatePlaced }))
+                    .GroupBy(row => row.ItemNumber, StringComparer.OrdinalIgnoreCase)
+                    .Select(group =>
                     {
-                        ItemNumber   = p.ItemNumber,   ProductName  = p.ItemNumber,
-                        QuantitySold = p.QuantitySold, Revenue      = p.Revenue,
-                        IsActive     = true,           DatePlaced   = p.DatePlaced
+                        var latest = group.OrderByDescending(row => row.IsActive).ThenByDescending(row => row.DatePlaced).First();
+                        itemStats.TryGetValue(group.Key, out var stats);
+                        return new ProductBreakdownItem
+                        {
+                            ItemNumber   = group.Key,
+                            ProductName  = _allProducts.FirstOrDefault(p => p.ItemNumber == group.Key)?.ItemName ?? group.Key,
+                            QuantitySold = stats.quantity,
+                            Revenue      = stats.revenue,
+                            IsActive     = latest.IsActive,
+                            DatePlaced   = latest.DatePlaced
+                        };
                     })
-                    .Concat(archivedProducts.Select(a => new ProductBreakdownItem
-                    {
-                        ItemNumber   = a.ItemNumber,  ProductName  = a.ItemNumber,
-                        QuantitySold = 0,              Revenue     = a.Revenue,
-                        IsActive     = false,          DatePlaced  = a.DatePlaced
-                    }))
+                    .OrderByDescending(item => item.Revenue)
                     .ToList();
 
-                var top = breakdown.OrderByDescending(p => p.Revenue).FirstOrDefault();
+                var top = breakdown.FirstOrDefault(item => item.Revenue > 0);
 
                 var vm = new SectionDetailViewModel
                 {
@@ -716,7 +754,14 @@ namespace Winton.Views
                     TotalQuantitySold  = breakdown.Sum(p => p.QuantitySold),
                     TopProductName     = top?.ProductName    ?? "N/A",
                     TopProductRevenue  = top?.Revenue        ?? 0,
-                    ProductBreakdown   = breakdown
+                    ProductBreakdown   = breakdown,
+                    DailyLabels        = Enumerable.Range(0, (_periodEnd - _periodStart).Days + 1)
+                                             .Select(i => _periodStart.AddDays(i).ToString("MMM d"))
+                                             .ToArray(),
+                    TopProductLabels   = itemStats.OrderByDescending(kv => kv.Value.revenue)
+                                             .Take(5)
+                                             .Select(kv => kv.Key)
+                                             .ToArray()
                 };
 
                 vm.DailyTrendline           = await ChartDataFactory.CreateDailyTrendlineAsync(sectionId, _periodStart, _periodEnd);

@@ -80,20 +80,24 @@ namespace Winton.ViewModels
         {
             try
             {
-                int    year      = DateTime.Now.Year;
-                int    month     = DateTime.Now.Month;
-                var    monthStart = new DateTime(year, month, 1);
-                var    monthEnd   = DateTime.Today;
-                var    prevMonthStart = new DateTime(month == 1 ? year - 1 : year, month == 1 ? 12 : month - 1, 1);
-                var    prevMonthEnd   = prevMonthStart.AddMonths(1).AddDays(-1);
+                int year  = DateTime.Now.Year;
+                int month = DateTime.Now.Month;
+                var today      = DateTime.Today;
+                var yearStart  = new DateTime(year, 1, 1);
+                var monthStart = new DateTime(year, month, 1);
+                var monthEnd   = today;
+
+                // Compare like with like: the same stretch of days in the prior period.
+                var prevMonthStart = monthStart.AddMonths(-1);
+                var prevMonthEnd   = today.AddMonths(-1);
+                var prevYearStart  = yearStart.AddYears(-1);
+                var prevYearEnd    = today.AddYears(-1);
 
                 // ── Kick off all independent queries in parallel ──────────────
-                var tAnnual      = SalesDataServices.GetTotalRevenueForYearAsync(year);
-                var tPrevAnnual  = SalesDataServices.GetTotalRevenueForYearAsync(year - 1);
-                var tMonth       = SalesDataServices.GetTotalRevenueForMonthAsync(year, month);
-                var tPrevMonth   = SalesDataServices.GetTotalRevenueForMonthAsync(
-                                       month == 1 ? year - 1 : year,
-                                       month == 1 ? 12 : month - 1);
+                var tAnnual      = SalesDataServices.GetTotalRevenueAsync(yearStart, today);
+                var tPrevAnnual  = SalesDataServices.GetTotalRevenueAsync(prevYearStart, prevYearEnd);
+                var tMonth       = SalesDataServices.GetTotalRevenueAsync(monthStart, monthEnd);
+                var tPrevMonth   = SalesDataServices.GetTotalRevenueAsync(prevMonthStart, prevMonthEnd);
                 var tUnits       = SalesDataServices.GetTotalUnitsSoldAsync(monthStart, monthEnd);
                 var tPrevUnits   = SalesDataServices.GetTotalUnitsSoldAsync(prevMonthStart, prevMonthEnd);
                 var tLastReport  = SalesDataServices.GetLastReportDateAsync();
@@ -124,9 +128,9 @@ namespace Winton.ViewModels
                 ActiveSections = revMap.Count(kv => kv.Value > 0).ToString();
 
                 // ── Delta badges ─────────────────────────────────────────────
-                (AnnualDeltaText,  AnnualDeltaBrush) = BuildDelta(annual,    prevAnnual, "vs last year");
-                (MonthDeltaText,   MonthDeltaBrush)  = BuildDelta(curMonth,  prevMonth,  "vs last month");
-                (UnitsDeltaText,   UnitsDeltaBrush)  = BuildDelta(units,     prevUnits,  "vs last month");
+                (AnnualDeltaText,  AnnualDeltaBrush) = BuildDelta(annual,    prevAnnual, "vs this point last year");
+                (MonthDeltaText,   MonthDeltaBrush)  = BuildDelta(curMonth,  prevMonth,  "vs this point last month");
+                (UnitsDeltaText,   UnitsDeltaBrush)  = BuildDelta(units,     prevUnits,  "vs this point last month");
 
                 // ── Last report date ─────────────────────────────────────────
                 var lastDate = tLastReport.Result;

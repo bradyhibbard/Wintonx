@@ -49,92 +49,84 @@ namespace Winton.Views
         }
         private async void AddSalesReport_Click(object sender, RoutedEventArgs e)
         {
-            // Open file dialog to select a sales report file
             Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog
             {
                 DefaultExt = ".xlsx",
-                Filter = "Excel Files|*.xls;*.xlsx;*.xlsm|CSV Files|*.csv"
+                Filter = "Excel Files|*.xls;*.xlsx;*.xlsm"
             };
 
-            if (dlg.ShowDialog() == true)
+            if (dlg.ShowDialog() != true) return;
+
+            var dialog = new FileNameWindow(DateTime.Now.ToString(DateFormat), DateTime.Now);
+            if (dialog.ShowDialog() != true) return;
+
+            DateTime reportDate = dialog.ReportDate;
+            string reportName = reportDate.ToString(DateFormat);
+
+            try
             {
-                string filename = dlg.FileName;
-
-                // Open a dialog to get the report date
-                var dialog = new FileNameWindow(DateTime.Now.ToString(DateFormat), DateTime.Now);
-
-                if (dialog.ShowDialog() == true)
+                bool replaceExisting = false;
+                if (await SalesDataServices.ReportExistsAsync(reportDate))
                 {
-                    DateTime reportDate = dialog.ReportDate;
-                    string newFilename = reportDate.ToString(DateFormat);
+                    var choice = MessageBox.Show(
+                        $"Sales data already exists for {reportName}.\n\n" +
+                        "Yes: replace it with this file.\n" +
+                        "No: add this file to it (only if this is a different report).\n" +
+                        "Cancel: stop without importing.",
+                        "Report Already Imported",
+                        MessageBoxButton.YesNoCancel,
+                        MessageBoxImage.Warning);
 
-                    try
-                    {
-                        // Await the async method call to ensure completion before proceeding
-                        await ImportServices.ImportSalesReportWithMappingAsync(filename, reportDate);
-
-                        MessageBox.Show($"Successfully imported {newFilename}!", "Import Successful", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"An error occurred while importing: {ex.Message}", "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    if (choice == MessageBoxResult.Cancel || choice == MessageBoxResult.None) return;
+                    replaceExisting = choice == MessageBoxResult.Yes;
                 }
+
+                var result = await ImportServices.ImportSalesReportWithMappingAsync(dlg.FileName, reportDate, replaceExisting);
+                await LoadReportsAsync();
+
+                string message = $"Imported {result.RowsImported:N0} rows for {reportName}.";
+                if (result.RowsSkippedInvalid > 0)
+                    message += $"\n\nSkipped {result.RowsSkippedInvalid:N0} rows with a missing item, price, or quantity.";
+                if (result.RowsSkippedUnknownCode > 0)
+                    message += $"\n\nSkipped {result.RowsSkippedUnknownCode:N0} rows with a transaction code the app doesn't count.";
+                if (result.ItemsNotInProductList > 0)
+                    message += $"\n\n{result.ItemsNotInProductList:N0} items aren't in your product list, so their sales won't appear on the sales floor.";
+
+                MessageBox.Show(message, "Import Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"The report was not imported.\n\n{ex.Message}", "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
 
         private async void DeleteSalesReport_Click(object sender, RoutedEventArgs e)
         {
-            var selectedReportDate = lstReports.SelectedItem as ReportDateDisplay;
-
-            if (selectedReportDate != null)
-            {
-                // Retrieve the actual reports for the selected date from the database
-                var reportsToDelete = await SalesDataServices.GetReportDetailsByDateAsync(selectedReportDate.ReportDate);
-
-                if (reportsToDelete.Any())
-                {
-                    var result = MessageBox.Show(
-                        $"Are you sure you want to delete all reports for {selectedReportDate.DisplayDate}?",
-                        "Confirm Deletion",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning);
-
-                    if (result == MessageBoxResult.Yes)
-                    {
-                        try
-                        {
-                            // Delete each report asynchronously
-                            foreach (var report in reportsToDelete)
-                            {
-                                await ImportServices.DeleteSalesReportAsync(report);
-                            }
-
-                            // Refresh the report list after deletion
-                            await LoadReportsAsync();
-
-                            MessageBox.Show($"Successfully deleted reports for {selectedReportDate.DisplayDate}.",
-                                "Deletion Successful", MessageBoxButton.OK, MessageBoxImage.Information);
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show($"Error deleting reports: {ex.Message}", "Deletion Failed",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("No reports found for the selected date.", "No Reports Found",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            else
+            if (lstReports.SelectedItem is not ReportDateDisplay selectedReportDate)
             {
                 MessageBox.Show("Please select a report date to delete.", "No Selection",
                     MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
+
+            var result = MessageBox.Show(
+                $"Are you sure you want to delete all reports for {selectedReportDate.DisplayDate}?",
+                "Confirm Deletion",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            bool deleted = await SalesDataServices.DeleteReportAsync(selectedReportDate.ReportDate);
+            await LoadReportsAsync();
+
+            if (deleted)
+                MessageBox.Show($"Successfully deleted reports for {selectedReportDate.DisplayDate}.",
+                    "Deletion Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+            else
+                MessageBox.Show($"Could not delete reports for {selectedReportDate.DisplayDate}.",
+                    "Deletion Failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
 

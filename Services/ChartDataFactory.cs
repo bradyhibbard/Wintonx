@@ -50,7 +50,8 @@ namespace Winton.Helpers
             DateTime start,
             DateTime end)
         {
-            var itemRevenue = await SalesDataServices.GetRevenueByItemForSectionAsync(sectionId, start, end);
+            var itemRevenue = (await SalesDataServices.GetItemStatsForSectionAsync(sectionId, start, end))
+                .ToDictionary(kv => kv.Key, kv => kv.Value.revenue);
 
             var top5 = itemRevenue
                 .OrderByDescending(kv => kv.Value)
@@ -76,7 +77,7 @@ namespace Winton.Helpers
             DateTime start,
             DateTime end)
         {
-            var rev = await ProductPlacementServices.GetRevenueDataAsync(start, end);
+            var rev = await SalesDataServices.GetRevenueDataAsync(start, end);
 
             decimal sectionRevenue = rev.ContainsKey(sectionId) ? rev[sectionId] : 0;
 

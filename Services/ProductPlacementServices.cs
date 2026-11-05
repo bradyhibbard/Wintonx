@@ -24,6 +24,16 @@ namespace Winton.Services
                 {
                     await connection.OpenAsync();
 
+                    // An item only needs one current placement per section.
+                    using (var existsCommand = new SqliteCommand(
+                        "SELECT EXISTS(SELECT 1 FROM ProductPlacements WHERE ItemNumber = @ItemNumber AND SectionID = @SectionID AND DateRemoved IS NULL)",
+                        connection))
+                    {
+                        existsCommand.Parameters.AddWithValue("@ItemNumber", itemNumber);
+                        existsCommand.Parameters.AddWithValue("@SectionID", sectionId);
+                        if (Convert.ToInt32(await existsCommand.ExecuteScalarAsync()) == 1) return;
+                    }
+
                     // Query the Products table to get ProductID, Grp, and Category for the given itemNumber.
                     string query = "SELECT ProductID, Grp, Category FROM Products WHERE ItemNumber = @ItemNumber";
                     using (var command = new SqliteCommand(query, connection))
@@ -150,17 +160,16 @@ namespace Winton.Services
                     await connection.OpenAsync();
 
                     string sql = @"
-                SELECT 
+                SELECT
                     pp.PlacementID,
                     pp.SectionID,
-                    p.ItemNumber,
-                    p.ProductID,
+                    pp.ItemNumber,
+                    pp.ProductID,
                     pp.DatePlaced,
                     pp.Revenue,
                     pp.QuantitySold,
                     pp.Grp
                 FROM ProductPlacements pp
-                JOIN Products p ON pp.ProductID = p.ProductID
                 WHERE pp.SectionID = @SectionID AND pp.DateRemoved IS NULL";
 
                     using (var command = new SqliteCommand(sql, connection))
@@ -175,7 +184,7 @@ namespace Winton.Services
                                 {
                                     PlacementID = reader["PlacementID"] != DBNull.Value ? Convert.ToInt32(reader["PlacementID"]) : 0,
                                     SectionID = reader["SectionID"].ToString(),
-                                    ProductID = Convert.ToInt32(reader["ProductID"]),
+                                    ProductID = reader["ProductID"] != DBNull.Value ? Convert.ToInt32(reader["ProductID"]) : 0,
                                     ItemNumber = reader["ItemNumber"].ToString(),
                                     QuantitySold = reader["QuantitySold"] != DBNull.Value ? Convert.ToInt32(reader["QuantitySold"]) : 0,
                                     Revenue = reader["Revenue"] != DBNull.Value ? Convert.ToDecimal(reader["Revenue"]) : 0m,
@@ -197,275 +206,156 @@ namespace Winton.Services
 
 
         /// <summary>
-        /// Retrieves the current placement of a product based on its item number.
+        /// Retrieves an item's current placement within one section.
         /// </summary>
-        /// <param name="itemNumber">The product's item number.</param>
-        /// <returns>The product placement details, or null if not found.</returns>
-        public static async Task<ProductPlacement> GetCurrentProductPlacementAsync(string itemNumber)
+        /// <returns>The placement details, or null if the item isn't in that section.</returns>
+        public static async Task<ProductPlacement> GetPlacementInSectionAsync(string itemNumber, string sectionId)
         {
-            try
+            using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+            await connection.OpenAsync();
+
+            using var command = new SqliteCommand(
+                "SELECT PlacementID, ItemNumber, SectionID, DatePlaced FROM ProductPlacements WHERE ItemNumber = @ItemNumber AND SectionID = @SectionID AND DateRemoved IS NULL",
+                connection);
+            command.Parameters.AddWithValue("@ItemNumber", itemNumber);
+            command.Parameters.AddWithValue("@SectionID", sectionId);
+
+            using var reader = await command.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+
+            return new ProductPlacement
             {
-                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
-                {
-                    await connection.OpenAsync();
-                    string query = "SELECT * FROM ProductPlacements WHERE ItemNumber = @ItemNumber AND DateRemoved IS NULL";
-
-                    using (var command = new SqliteCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@ItemNumber", itemNumber);
-
-                        using (var reader = await command.ExecuteReaderAsync())
-                        {
-                            if (await reader.ReadAsync())
-                            {
-                                return new ProductPlacement
-                                {
-                                    ProductID = reader["ProductID"] != DBNull.Value ? Convert.ToInt32(reader["ProductID"]) : 0,
-                                    SectionID = reader["SectionID"].ToString(),
-                                    ItemNumber = reader["ItemNumber"].ToString(),
-                                    QuantitySold = reader["QuantitySold"] != DBNull.Value ? Convert.ToInt32(reader["QuantitySold"]) : 0,
-                                    Revenue = reader["Revenue"] != DBNull.Value ? Convert.ToDecimal(reader["Revenue"]) : 0m,
-                                    DatePlaced = reader["DatePlaced"] != DBNull.Value ? Convert.ToDateTime(reader["DatePlaced"]) : DateTime.MinValue
-                                };
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ProductPlacementServices] GetCurrentProductPlacementAsync: {ex}");
-            }
-
-            return null;
+                PlacementID = Convert.ToInt32(reader["PlacementID"]),
+                ItemNumber = reader["ItemNumber"].ToString(),
+                SectionID = reader["SectionID"].ToString(),
+                DatePlaced = reader["DatePlaced"] != DBNull.Value ? Convert.ToDateTime(reader["DatePlaced"]) : DateTime.MinValue
+            };
         }
+
 
         /// <summary>
-        /// Retrieves revenue data grouped by section within a given date range.
+        /// Removes an item from one section and records it in that section's archive.
+        /// Both changes are saved together. Failures throw so the caller can report them.
         /// </summary>
-        /// <param name="startDate">Start date of the range.</param>
-        /// <param name="endDate">End date of the range.</param>
-        /// <returns>A dictionary mapping section IDs to total revenue.</returns>
-        public static async Task<Dictionary<string, decimal>> GetRevenueDataAsync(DateTime startDate, DateTime endDate)
+        public static async Task RemoveItemFromSectionAsync(string itemNumber, string sectionId, DateTime dateRemoved, string removalNotes)
         {
-            var revenueData = new Dictionary<string, decimal>();
+            using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
 
-            try
+            using (var archiveCommand = new SqliteCommand(@"
+                INSERT INTO Archive (ProductID, SectionID, ItemNumber, QuantitySold, Revenue, DatePlaced, DateRemoved, RemovalNotes)
+                SELECT ProductID, SectionID, ItemNumber, QuantitySold, Revenue, DatePlaced, @DateRemoved, @RemovalNotes
+                FROM ProductPlacements
+                WHERE ItemNumber = @ItemNumber AND SectionID = @SectionID AND DateRemoved IS NULL",
+                connection, transaction))
             {
-                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
-                {
-                    await connection.OpenAsync();
-                    string query = @"
-                        SELECT SectionID, SUM(Revenue) as TotalRevenue
-                        FROM ProductPlacements
-                        WHERE DatePlaced BETWEEN @StartDate AND @EndDate
-                        GROUP BY SectionID
-                        ORDER BY TotalRevenue DESC";
-
-                    using (var command = new SqliteCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@StartDate", startDate);
-                        command.Parameters.AddWithValue("@EndDate", endDate);
-
-                        using (var reader = await command.ExecuteReaderAsync())
-                        {
-                            while (await reader.ReadAsync())
-                            {
-                                string sectionId = reader["SectionID"].ToString();
-                                decimal totalRevenue = reader["TotalRevenue"] != DBNull.Value ? Convert.ToDecimal(reader["TotalRevenue"]) : 0m;
-                                revenueData[sectionId] = totalRevenue;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ProductPlacementServices] GetRevenueDataAsync: {ex}");
+                archiveCommand.Parameters.AddWithValue("@ItemNumber", itemNumber);
+                archiveCommand.Parameters.AddWithValue("@SectionID", sectionId);
+                archiveCommand.Parameters.AddWithValue("@DateRemoved", dateRemoved);
+                archiveCommand.Parameters.AddWithValue("@RemovalNotes", removalNotes ?? (object)DBNull.Value);
+                await archiveCommand.ExecuteNonQueryAsync();
             }
 
-            return revenueData;
+            using (var updateCommand = new SqliteCommand(@"
+                UPDATE ProductPlacements SET DateRemoved = @DateRemoved
+                WHERE ItemNumber = @ItemNumber AND SectionID = @SectionID AND DateRemoved IS NULL",
+                connection, transaction))
+            {
+                updateCommand.Parameters.AddWithValue("@ItemNumber", itemNumber);
+                updateCommand.Parameters.AddWithValue("@SectionID", sectionId);
+                updateCommand.Parameters.AddWithValue("@DateRemoved", dateRemoved);
+                await updateCommand.ExecuteNonQueryAsync();
+            }
+
+            await transaction.CommitAsync();
         }
+
+
 
         /// <summary>
-        /// Removes a product from a section by setting its removal date.
+        /// Archives a section's current products and deletes the section. Products removed earlier
+        /// are already in the archive. All changes are saved together; failures throw so the
+        /// caller doesn't report success or remove the section from the screen.
         /// </summary>
-        public static async Task RemoveProductFromSectionAsync(int productId, string sectionId, DateTime dateRemoved)
-        {
-            try
-            {
-                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
-                {
-                    await connection.OpenAsync();
-                    string query = "UPDATE ProductPlacements SET DateRemoved = @DateRemoved WHERE ProductID = @ProductID AND SectionID = @SectionID AND DateRemoved IS NULL";
-
-                    using (var command = new SqliteCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@ProductID", productId);
-                        command.Parameters.AddWithValue("@SectionID", sectionId);
-                        command.Parameters.AddWithValue("@DateRemoved", dateRemoved);
-
-                        await command.ExecuteNonQueryAsync();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ProductPlacementServices] RemoveProductFromSectionAsync: {ex}");
-            }
-        }
-
-        /// <summary>
-        /// Archives a product placement by moving it to the archive table and removing it from active placements.
-        /// </summary>
-        public static async Task ArchiveProductPlacementAsync(int productId, string sectionId, string removalNotes, int quantitySold, decimal revenue)
-        {
-            try
-            {
-                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
-                {
-                    await connection.OpenAsync();
-
-                    string query = @"
-                INSERT INTO Archive (ProductID, SectionID, ItemNumber, DatePlaced, DateRemoved, QuantitySold, Revenue)
-                SELECT pp.ProductID, pp.SectionID, p.ItemNumber, pp.DatePlaced, pp.DateRemoved, @QuantitySold, @Revenue
-                FROM ProductPlacements pp
-                INNER JOIN Products p ON pp.ProductID = p.ProductID
-                WHERE pp.ProductID = @ProductID AND pp.SectionID = @SectionID";
-
-                    using (var command = new SqliteCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@ProductID", productId);
-                        command.Parameters.AddWithValue("@SectionID", sectionId);
-                        command.Parameters.AddWithValue("@QuantitySold", quantitySold);
-                        command.Parameters.AddWithValue("@Revenue", revenue);
-
-                        await command.ExecuteNonQueryAsync();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ProductPlacementServices] ArchiveProductPlacementAsync: {ex}");
-            }
-        }
-
-
         public static async Task ArchiveAndDeleteSectionAsync(string sectionId)
         {
-            using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
+            using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+
+            using (var archiveCommand = new SqliteCommand(@"
+                INSERT INTO Archive (ProductID, SectionID, ItemNumber, QuantitySold, Revenue, DatePlaced, DateRemoved, RemovalNotes)
+                SELECT ProductID, SectionID, ItemNumber, QuantitySold, Revenue, DatePlaced, @DateRemoved, 'Section Deleted'
+                FROM ProductPlacements
+                WHERE SectionID = @SectionID AND DateRemoved IS NULL",
+                connection, transaction))
             {
-                await connection.OpenAsync();
-
-                using (var transaction = connection.BeginTransaction())
-                {
-                    try
-                    {
-                        // Step 1: Get all ProductPlacements tied to the section
-                        string selectQuery = @"
-                    SELECT pp.PlacementID, pp.ProductID, pp.SectionID, pp.ItemNumber, pp.QuantitySold, 
-                           pp.Revenue, pp.DatePlaced, pp.DateRemoved
-                    FROM ProductPlacements pp
-                    WHERE pp.SectionID = @SectionID";
-
-                        List<ProductPlacement> placements = new List<ProductPlacement>();
-
-                        using (var selectCommand = new SqliteCommand(selectQuery, connection, transaction))
-                        {
-                            selectCommand.Parameters.AddWithValue("@SectionID", sectionId);
-
-                            using (var reader = await selectCommand.ExecuteReaderAsync())
-                            {
-                                while (await reader.ReadAsync())
-                                {
-                                    placements.Add(new ProductPlacement
-                                    {
-                                        PlacementID = Convert.ToInt32(reader["PlacementID"]),
-                                        ProductID = Convert.ToInt32(reader["ProductID"]),
-                                        SectionID = reader["SectionID"].ToString(),
-                                        ItemNumber = reader["ItemNumber"].ToString(),
-                                        QuantitySold = reader["QuantitySold"] != DBNull.Value ? Convert.ToInt32(reader["QuantitySold"]) : 0,
-                                        Revenue = reader["Revenue"] != DBNull.Value ? Convert.ToDecimal(reader["Revenue"]) : 0m,
-                                        DatePlaced = reader["DatePlaced"] != DBNull.Value ? Convert.ToDateTime(reader["DatePlaced"]) : DateTime.MinValue,
-                                        DateRemoved = DateTime.UtcNow
-                                    });
-                                }
-                            }
-                        }
-
-                        // Step 2: Insert each placement into Archive
-                        foreach (var placement in placements)
-                        {
-                            string insertArchiveQuery = @"
-                        INSERT INTO Archive (PlacementID, ProductID, SectionID, ItemNumber, QuantitySold, Revenue, DatePlaced, DateRemoved, RemovalNotes)
-                        VALUES (@PlacementID, @ProductID, @SectionID, @ItemNumber, @QuantitySold, @Revenue, @DatePlaced, @DateRemoved, @RemovalNotes)";
-
-                            using (var insertCommand = new SqliteCommand(insertArchiveQuery, connection, transaction))
-                            {
-                                insertCommand.Parameters.AddWithValue("@PlacementID", placement.PlacementID);
-                                insertCommand.Parameters.AddWithValue("@ProductID", placement.ProductID);
-                                insertCommand.Parameters.AddWithValue("@SectionID", placement.SectionID);
-                                insertCommand.Parameters.AddWithValue("@ItemNumber", placement.ItemNumber);  // ✅ Now includes ItemNumber
-                                insertCommand.Parameters.AddWithValue("@QuantitySold", placement.QuantitySold);
-                                insertCommand.Parameters.AddWithValue("@Revenue", placement.Revenue);
-                                insertCommand.Parameters.AddWithValue("@DatePlaced", placement.DatePlaced);
-                                insertCommand.Parameters.AddWithValue("@DateRemoved", placement.DateRemoved);
-                                insertCommand.Parameters.AddWithValue("@RemovalNotes", "Section Deleted");
-
-                                await insertCommand.ExecuteNonQueryAsync();
-                            }
-                        }
-
-                        // Step 3: Delete the product placements tied to this section
-                        string deletePlacementsQuery = "DELETE FROM ProductPlacements WHERE SectionID = @SectionID";
-                        using (var deletePlacementsCommand = new SqliteCommand(deletePlacementsQuery, connection, transaction))
-                        {
-                            deletePlacementsCommand.Parameters.AddWithValue("@SectionID", sectionId);
-                            await deletePlacementsCommand.ExecuteNonQueryAsync();
-                        }
-
-                        // Step 4: Delete the section itself
-                        string deleteSectionQuery = "DELETE FROM Sections WHERE SectionID = @SectionID";
-                        using (var deleteSectionCommand = new SqliteCommand(deleteSectionQuery, connection, transaction))
-                        {
-                            deleteSectionCommand.Parameters.AddWithValue("@SectionID", sectionId);
-                            await deleteSectionCommand.ExecuteNonQueryAsync();
-                        }
-
-                        await transaction.CommitAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        await transaction.RollbackAsync();
-                        MessageBox.Show($"[Error] ArchiveAndDeleteSectionAsync: {ex.Message}");
-                    }
-                }
+                archiveCommand.Parameters.AddWithValue("@SectionID", sectionId);
+                archiveCommand.Parameters.AddWithValue("@DateRemoved", DateTime.Now);
+                await archiveCommand.ExecuteNonQueryAsync();
             }
+
+            using (var deletePlacements = new SqliteCommand("DELETE FROM ProductPlacements WHERE SectionID = @SectionID", connection, transaction))
+            {
+                deletePlacements.Parameters.AddWithValue("@SectionID", sectionId);
+                await deletePlacements.ExecuteNonQueryAsync();
+            }
+
+            using (var deleteSection = new SqliteCommand("DELETE FROM Sections WHERE SectionID = @SectionID", connection, transaction))
+            {
+                deleteSection.Parameters.AddWithValue("@SectionID", sectionId);
+                await deleteSection.ExecuteNonQueryAsync();
+            }
+
+            await transaction.CommitAsync();
         }
 
+        /// <summary>
+        /// Corrects an archived product's dates, and the matching placement history
+        /// so section sales follow the corrected dates.
+        /// </summary>
         public static async Task UpdateArchiveDatesAsync(int placementId, DateTime? dateAdded, DateTime? dateRemoved)
         {
             try
             {
-                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
+                using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+
+                if (dateAdded.HasValue && dateRemoved.HasValue)
                 {
-                    await connection.OpenAsync();
-
-                    string query = @"
-                UPDATE Archive 
-                SET DatePlaced = @DatePlaced, 
-                    DateRemoved = @DateRemoved 
-                WHERE PlacementID = @PlacementID";
-
-                    using (var command = new SqliteCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@DatePlaced", dateAdded.HasValue ? (object)dateAdded.Value : DBNull.Value);
-                        command.Parameters.AddWithValue("@DateRemoved", dateRemoved.HasValue ? (object)dateRemoved.Value : DBNull.Value);
-                        command.Parameters.AddWithValue("@PlacementID", placementId);
-
-                        await command.ExecuteNonQueryAsync();
-                    }
+                    using var historyCommand = new SqliteCommand(@"
+                        UPDATE ProductPlacements
+                        SET DatePlaced = @DatePlaced, DateRemoved = @DateRemoved
+                        WHERE PlacementID IN (
+                            SELECT pp.PlacementID
+                            FROM ProductPlacements pp
+                            INNER JOIN Archive a
+                                ON a.ItemNumber = pp.ItemNumber
+                               AND a.SectionID = pp.SectionID
+                               AND date(a.DateRemoved) = date(pp.DateRemoved)
+                            WHERE a.PlacementID = @PlacementID)",
+                        connection, transaction);
+                    historyCommand.Parameters.AddWithValue("@DatePlaced", dateAdded.Value);
+                    historyCommand.Parameters.AddWithValue("@DateRemoved", dateRemoved.Value);
+                    historyCommand.Parameters.AddWithValue("@PlacementID", placementId);
+                    await historyCommand.ExecuteNonQueryAsync();
                 }
+
+                using (var command = new SqliteCommand(@"
+                    UPDATE Archive
+                    SET DatePlaced = @DatePlaced,
+                        DateRemoved = @DateRemoved
+                    WHERE PlacementID = @PlacementID", connection, transaction))
+                {
+                    command.Parameters.AddWithValue("@DatePlaced", dateAdded.HasValue ? (object)dateAdded.Value : DBNull.Value);
+                    command.Parameters.AddWithValue("@DateRemoved", dateRemoved.HasValue ? (object)dateRemoved.Value : DBNull.Value);
+                    command.Parameters.AddWithValue("@PlacementID", placementId);
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                await transaction.CommitAsync();
             }
             catch (Exception ex)
             {
@@ -515,33 +405,20 @@ namespace Winton.Services
             return null;
         }
 
-        public static async Task UpdateDatePlacedAsync(int productId, string sectionId, DateTime newDatePlaced)
+        public static async Task UpdateDatePlacedAsync(string itemNumber, string sectionId, DateTime newDatePlaced)
         {
-            try
-            {
-                using (var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};"))
-                {
-                    await connection.OpenAsync();
+            using var connection = new SqliteConnection($"Data Source={DatabaseConfig.DbPath};");
+            await connection.OpenAsync();
 
-                    string query = @"
-                UPDATE ProductPlacements 
-                SET DatePlaced = @NewDatePlaced 
-                WHERE ProductID = @ProductID AND SectionID = @SectionID AND DateRemoved IS NULL";
+            using var command = new SqliteCommand(@"
+                UPDATE ProductPlacements
+                SET DatePlaced = @NewDatePlaced
+                WHERE ItemNumber = @ItemNumber AND SectionID = @SectionID AND DateRemoved IS NULL", connection);
+            command.Parameters.AddWithValue("@NewDatePlaced", newDatePlaced);
+            command.Parameters.AddWithValue("@ItemNumber", itemNumber);
+            command.Parameters.AddWithValue("@SectionID", sectionId);
 
-                    using (var command = new SqliteCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@NewDatePlaced", newDatePlaced);
-                        command.Parameters.AddWithValue("@ProductID", productId);
-                        command.Parameters.AddWithValue("@SectionID", sectionId);
-
-                        await command.ExecuteNonQueryAsync();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ProductPlacementServices] UpdateDatePlacedAsync: {ex}");
-            }
+            await command.ExecuteNonQueryAsync();
         }
 
         public static async Task<List<ProductPlacement>> GetArchivedProductsBySectionAsync(string sectionId)
@@ -555,10 +432,15 @@ namespace Winton.Services
                     await connection.OpenAsync();
 
                     string query = @"
-                SELECT PlacementID, ItemNumber, DatePlaced, DateRemoved, Revenue
-                FROM Archive
-                WHERE SectionID = @SectionID
-                ORDER BY DateRemoved DESC";
+                SELECT a.PlacementID, a.ItemNumber, a.DatePlaced, a.DateRemoved,
+                       (SELECT IFNULL(SUM(sd.Revenue), 0)
+                        FROM SalesData sd
+                        WHERE sd.ItemNumber = a.ItemNumber
+                          AND date(sd.SaleDate) >= date(a.DatePlaced)
+                          AND (a.DateRemoved IS NULL OR date(sd.SaleDate) <= date(a.DateRemoved))) AS Revenue
+                FROM Archive a
+                WHERE a.SectionID = @SectionID
+                ORDER BY a.DateRemoved DESC";
 
                     using (var command = new SqliteCommand(query, connection))
                     {
