@@ -56,14 +56,18 @@ jobs:
           "fileversion=$fileVer" >> $env:GITHUB_OUTPUT
           Write-Host "Latest tag: $($tags[0])  -> Next: v$next"
 
+      # Named directly: the repo also contains a test project.
       - name: Find .csproj
         id: findproj
         shell: pwsh
         run: |
-          $proj = Get-ChildItem -Recurse -Filter *.csproj | Select-Object -First 1
-          if (-not $proj) { throw "No .csproj found" }
+          $proj = Get-Item "Winton.csproj"
           "path=$($proj.FullName)" >> $env:GITHUB_OUTPUT
           Write-Host "Using project: $($proj.FullName)"
+
+      # A failing test stops the release before anything is built or published.
+      - name: Run tests
+        run: dotnet test tests/Wintonx.Tests/Wintonx.Tests.csproj -c Release --logger "console;verbosity=normal"
 
       - name: Restore
         run: dotnet restore "${{ steps.findproj.outputs.path }}"

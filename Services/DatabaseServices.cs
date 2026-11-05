@@ -6,7 +6,7 @@ namespace Winton.Services
 {
     internal sealed class DatabaseService
     {
-        private static readonly string dbPath = DatabaseConfig.DbPath;
+        private static string dbPath => DatabaseConfig.DbPath;
 
         public static async Task InitializeDatabaseAsync()
         {
@@ -118,8 +118,7 @@ namespace Winton.Services
         /// <summary>
         /// Folder holding database backups.
         /// </summary>
-        public static string BackupDirectory =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Winton", "DatabaseBackups");
+        public static string BackupDirectory => DatabaseConfig.BackupFolder;
 
         public static async Task<string> BackupDatabaseAsync()
         {

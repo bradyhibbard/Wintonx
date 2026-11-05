@@ -80,18 +80,17 @@ namespace Winton.ViewModels
         {
             try
             {
-                int year  = DateTime.Now.Year;
-                int month = DateTime.Now.Month;
-                var today      = DateTime.Today;
-                var yearStart  = new DateTime(year, 1, 1);
-                var monthStart = new DateTime(year, month, 1);
-                var monthEnd   = today;
+                var today   = DateTime.Today;
+                int year    = today.Year;
+                var periods = DashboardPeriods.For(today);
 
-                // Compare like with like: the same stretch of days in the prior period.
-                var prevMonthStart = monthStart.AddMonths(-1);
-                var prevMonthEnd   = today.AddMonths(-1);
-                var prevYearStart  = yearStart.AddYears(-1);
-                var prevYearEnd    = today.AddYears(-1);
+                var yearStart      = periods.YearStart;
+                var monthStart     = periods.MonthStart;
+                var monthEnd       = today;
+                var prevMonthStart = periods.PreviousMonthStart;
+                var prevMonthEnd   = periods.PreviousMonthEnd;
+                var prevYearStart  = periods.PreviousYearStart;
+                var prevYearEnd    = periods.PreviousYearEnd;
 
                 // ── Kick off all independent queries in parallel ──────────────
                 var tAnnual      = SalesDataServices.GetTotalRevenueAsync(yearStart, today);
