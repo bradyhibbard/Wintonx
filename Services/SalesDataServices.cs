@@ -11,7 +11,7 @@ namespace Winton.Services
     /// </summary>
     internal class SalesDataServices
     {
-        private static readonly string ConnectionString = $"Data Source={DatabaseConfig.DbPath};";
+        private static string ConnectionString => $"Data Source={DatabaseConfig.DbPath};";
 
         // Returns (codes 30 and 37) reduce units sold, whatever sign the report used.
         private const string SignedQuantitySql =
