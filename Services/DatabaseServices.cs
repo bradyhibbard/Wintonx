@@ -6,7 +6,95 @@ namespace Winton.Services
 {
     internal sealed class DatabaseService
     {
-        private static readonly string dbPath = DatabaseConfig.DbPath;
+        private static string dbPath => DatabaseConfig.DbPath;
+
+        // Placements and the archive are history. They keep their own item numbers so they
+        // outlive changes to the product list, and archive rows outlive deleted sections.
+        private const string PlacementColumns = @"
+                PlacementID INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProductID INTEGER,
+                SectionID TEXT,
+                ItemNumber TEXT,
+                QuantitySold INTEGER,
+                Revenue DECIMAL(10,2),
+                DatePlaced DATETIME,
+                DateRemoved DATETIME,
+                Cat TEXT,
+                Grp TEXT,
+                FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)";
+
+        private const string ArchiveColumns = @"
+                PlacementID INTEGER PRIMARY KEY,
+                ProductID INTEGER,
+                SectionID TEXT,
+                ItemNumber TEXT,
+                QuantitySold INTEGER,
+                Revenue DECIMAL(10,2),
+                DatePlaced DATETIME,
+                DateRemoved DATETIME,
+                RemovalNotes TEXT";
+
+        /// <summary>
+        /// Older databases tied placements to products, and the archive to products and sections.
+        /// That blocked deleting a section with archive history and removing a placed product from
+        /// the product list. Rebuilds those tables without the ties, keeping all rows, after saving a backup.
+        /// </summary>
+        private static async Task UpgradeHistoryTablesAsync()
+        {
+            const string needsUpgradeSql = @"
+                SELECT COUNT(*) FROM sqlite_master
+                WHERE type = 'table'
+                  AND ((name = 'ProductPlacements' AND sql LIKE '%REFERENCES Products%')
+                    OR (name = 'Archive' AND sql LIKE '%FOREIGN KEY%'))";
+
+            using (var checkConnection = new SqliteConnection($"Data Source={dbPath};"))
+            {
+                await checkConnection.OpenAsync();
+                using var checkCommand = new SqliteCommand(needsUpgradeSql, checkConnection);
+                if (Convert.ToInt32(await checkCommand.ExecuteScalarAsync()) == 0) return;
+            }
+
+            await CopyDatabaseToBackupAsync("BeforeUpgrade");
+
+            using var connection = new SqliteConnection($"Data Source={dbPath};");
+            await connection.OpenAsync();
+
+            // SQLite ignores this setting inside a transaction, so it goes first and is restored after.
+            await ExecuteNonQueryAsync(connection, "PRAGMA foreign_keys = OFF");
+            try
+            {
+                using var transaction = connection.BeginTransaction();
+
+                await RebuildTableAsync(connection, transaction, "ProductPlacements", PlacementColumns,
+                    "PlacementID, ProductID, SectionID, ItemNumber, QuantitySold, Revenue, DatePlaced, DateRemoved, Cat, Grp");
+                await RebuildTableAsync(connection, transaction, "Archive", ArchiveColumns,
+                    "PlacementID, ProductID, SectionID, ItemNumber, QuantitySold, Revenue, DatePlaced, DateRemoved, RemovalNotes");
+
+                await transaction.CommitAsync();
+            }
+            finally
+            {
+                await ExecuteNonQueryAsync(connection, "PRAGMA foreign_keys = ON");
+            }
+        }
+
+        private static async Task RebuildTableAsync(
+            SqliteConnection connection, SqliteTransaction transaction, string table, string columnDefinitions, string columnNames)
+        {
+            string[] statements =
+            {
+                $"CREATE TABLE {table}_upgraded ({columnDefinitions})",
+                $"INSERT INTO {table}_upgraded ({columnNames}) SELECT {columnNames} FROM {table}",
+                $"DROP TABLE {table}",
+                $"ALTER TABLE {table}_upgraded RENAME TO {table}"
+            };
+
+            foreach (string sql in statements)
+            {
+                using var command = new SqliteCommand(sql, connection, transaction);
+                await command.ExecuteNonQueryAsync();
+            }
+        }
 
         public static async Task InitializeDatabaseAsync()
         {
@@ -80,33 +168,11 @@ namespace Winton.Services
                 Category TEXT,
                 Grp TEXT");
 
-                    await CreateTableAsync(connection, "ProductPlacements", @"
-                PlacementID INTEGER PRIMARY KEY AUTOINCREMENT,
-                ProductID INTEGER,
-                SectionID TEXT,
-                ItemNumber TEXT,
-                QuantitySold INTEGER,
-                Revenue DECIMAL(10,2),
-                DatePlaced DATETIME,
-                DateRemoved DATETIME,
-                Cat TEXT,
-                Grp TEXT,
-                FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
-                FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)");
-
-                    await CreateTableAsync(connection, "Archive", @"
-                PlacementID INTEGER PRIMARY KEY,
-                ProductID INTEGER,
-                SectionID TEXT,
-                ItemNumber TEXT,
-                QuantitySold INTEGER,
-                Revenue DECIMAL(10,2),
-                DatePlaced DATETIME,
-                DateRemoved DATETIME,
-                RemovalNotes TEXT,
-                FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
-                FOREIGN KEY (SectionID) REFERENCES Sections(SectionID)");
+                    await CreateTableAsync(connection, "ProductPlacements", PlacementColumns);
+                    await CreateTableAsync(connection, "Archive", ArchiveColumns);
                 }
+
+                await UpgradeHistoryTablesAsync();
             }
             catch (Exception ex)
             {
@@ -118,8 +184,7 @@ namespace Winton.Services
         /// <summary>
         /// Folder holding database backups.
         /// </summary>
-        public static string BackupDirectory =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Winton", "DatabaseBackups");
+        public static string BackupDirectory => DatabaseConfig.BackupFolder;
 
         public static async Task<string> BackupDatabaseAsync()
         {
@@ -156,6 +221,9 @@ namespace Winton.Services
 
                 SqliteConnection.ClearAllPools();
                 await Task.Run(() => File.Copy(backupFilePath, dbPath, overwrite: true));
+
+                // An older backup may need the same upgrade the app does at startup.
+                await UpgradeHistoryTablesAsync();
 
                 return $"Database restored successfully. Your previous data was saved to: {safetyCopy}";
             }

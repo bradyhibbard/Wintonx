@@ -16,6 +16,14 @@
 		<FileVersion>1.0.0.0</FileVersion>
     </PropertyGroup>
 
+  <!-- The test project builds separately; keep its files out of the app. -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <None Remove="tests\**" />
+    <EmbeddedResource Remove="tests\**" />
+    <Page Remove="tests\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Remove="Assets\Couch.jpg" />
     <None Remove="Assets\SF2.png" />
