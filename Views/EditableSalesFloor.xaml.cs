@@ -70,7 +70,10 @@ namespace Winton.Views
 
         private void RestoreShapeAppearance(Shape s)
         {
-            s.Stroke = s.Tag?.ToString() == "Partition" ? Brushes.SteelBlue : Brushes.Black;
+            if (s.Tag?.ToString() == "Partition")
+                s.Stroke = Brushes.SteelBlue;
+            else
+                s.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
             s.StrokeThickness = 2;
         }
 
@@ -151,6 +154,7 @@ namespace Winton.Views
         public EditableSalesFloor()
         {
             InitializeComponent();
+            _perimeterLine.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
             this.Focusable = true;
             this.Focus();
 
@@ -594,6 +598,8 @@ namespace Winton.Views
                 if (_isDrawingPartition)
                 {
                     _partitionPoints.Clear();
+                    foreach (var dot in _partitionDots)
+                        SalesFloorCanvas.Children.Remove(dot);
                     _partitionDots.Clear();
                     _partitionLine.Points.Clear();
                     _partitionPreviewLine.Visibility = Visibility.Collapsed;
@@ -692,10 +698,18 @@ namespace Winton.Views
 
                         if (result == MessageBoxResult.Yes)
                         {
-                            await ProductPlacementServices.ArchiveAndDeleteSectionAsync(sectionId);
-                            SalesFloorCanvas.Children.Remove(sectionElement);
-                            ShowAutoSaved();
-                            Debug.WriteLine($"[EditableSalesFloor] Section {sectionId} deleted via Delete key.");
+                            try
+                            {
+                                await ProductPlacementServices.ArchiveAndDeleteSectionAsync(sectionId);
+                                SalesFloorCanvas.Children.Remove(sectionElement);
+                                ShowAutoSaved();
+                                Debug.WriteLine($"[EditableSalesFloor] Section {sectionId} deleted via Delete key.");
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"The section could not be deleted.\n\n{ex.Message}", "Error",
+                                    MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
                         }
                     }
                     e.Handled = true;
@@ -1011,6 +1025,7 @@ namespace Winton.Views
                     Stroke = Brushes.Black,
                     StrokeThickness = 2
                 };
+                _perimeterLine.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
                 SalesFloorCanvas.Children.Add(_perimeterLine);
             }
         }
@@ -1180,7 +1195,7 @@ namespace Winton.Views
         {
 
             MessageBoxResult result = MessageBox.Show(
-                "Are you sure you want to clear the entire sales floor layout?",
+                "Are you sure you want to clear the perimeter? Sections and partitions will stay in place.",
                 "Confirm Clear",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);

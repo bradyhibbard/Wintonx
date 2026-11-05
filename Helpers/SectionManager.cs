@@ -54,6 +54,7 @@ namespace Winton.Helpers
                 _ => null
             };
             if (newShape == null) return;
+            newShape.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
 
             // 2) Base position (will apply to the *host* we add)
             Canvas.SetLeft(newShape, x);
@@ -249,12 +250,12 @@ namespace Winton.Helpers
             // 🛠 1. Clear highlight from previously selected shape
             if (_selectedElement is Shape previousShape)
             {
-                previousShape.Stroke = Brushes.Black;
+                previousShape.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
                 previousShape.StrokeThickness = 1;
             }
             else if (_selectedElement is Button previousButton && previousButton.Content is Shape previousButtonShape)
             {
-                previousButtonShape.Stroke = Brushes.Black;
+                previousButtonShape.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
                 previousButtonShape.StrokeThickness = 1;
             }
 
@@ -489,12 +490,12 @@ namespace Winton.Helpers
             {
                 if (_selectedElement is Shape shape)
                 {
-                    shape.Stroke = Brushes.Black;
+                    shape.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
                     shape.StrokeThickness = 1;
                 }
                 else if (_selectedElement is Button button && button.Content is Shape buttonShape)
                 {
-                    buttonShape.Stroke = Brushes.Black;
+                    buttonShape.SetResourceReference(Shape.StrokeProperty, "PrimaryText");
                     buttonShape.StrokeThickness = 1;
                 }
 
